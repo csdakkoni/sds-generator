@@ -1,9 +1,9 @@
 /**
  * Classification engine for mixtures under SEA (Turkish CLP).
  *
- * Pure TypeScript: no UI, database or network dependencies. Rules are added in step 2,
- * each with unit tests that reference the relevant CLP/SEA table.
+ * Pure TypeScript: no UI, database or network dependencies. Every rule is unit tested
+ * against the CLP/SEA table it implements.
  */
-
-/** Recorded on every SDS revision so a result can be traced to the engine that produced it. */
-export const ENGINE_VERSION = '0.0.0';
+export { classifyMixture } from './classify';
+export { ENGINE_VERSION } from './version';
+export * from './types';

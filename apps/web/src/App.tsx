@@ -5,6 +5,8 @@ import { supabase } from './lib/supabase';
 import type { Membership } from './lib/types';
 import { AuthScreen } from './screens/AuthScreen';
 import { CreateOrganization } from './screens/CreateOrganization';
+import { Product } from './screens/Product';
+import { Products } from './screens/Products';
 import { RawMaterials } from './screens/RawMaterials';
 import { Review } from './screens/Review';
 
@@ -62,6 +64,10 @@ export function App() {
     );
 
   const reviewId = route.match(/^\/hammaddeler\/([0-9a-f-]{36})$/)?.[1];
+  const productId = route.match(/^\/urunler\/([0-9a-f-]{36})$/)?.[1];
+  const section = route.startsWith('/urunler') ? 'urunler' : 'hammaddeler';
+  const tab = (active: boolean) =>
+    `rounded-md px-3 py-1.5 ${active ? 'bg-sky-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`;
   const roleLabel = hasRole(membership, 'kdu')
     ? 'KDU'
     : membership.role === 'viewer'
@@ -80,12 +86,12 @@ export function App() {
             SDS Hazırlama
           </span>
           <nav aria-label="Bölümler" className="flex flex-wrap gap-1 text-sm">
-            <a href="#/hammaddeler" className="rounded-md bg-sky-900 px-3 py-1.5 text-white">
+            <a href="#/hammaddeler" className={tab(section === 'hammaddeler')}>
               Hammaddeler
             </a>
-            <span className="rounded-md px-3 py-1.5 text-slate-400" title="Sonraki adımda gelecek">
+            <a href="#/urunler" className={tab(section === 'urunler')}>
               Ürünler
-            </span>
+            </a>
             <span className="rounded-md px-3 py-1.5 text-slate-400" title="Sonraki adımda gelecek">
               SDS'ler
             </span>
@@ -105,7 +111,15 @@ export function App() {
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">
-        {reviewId ? (
+        {productId ? (
+          <Product
+            membership={membership}
+            productId={productId}
+            onBack={() => navigate('/urunler')}
+          />
+        ) : section === 'urunler' ? (
+          <Products membership={membership} onOpen={(id) => navigate(`/urunler/${id}`)} />
+        ) : reviewId ? (
           <Review
             membership={membership}
             userId={session.user.id}

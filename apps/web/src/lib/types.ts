@@ -26,6 +26,8 @@ export interface ClassificationLine {
   category: string | null;
   hCode: string | null;
   source: SourceRef;
+  /** Set when the KDU picked the H code because the SDS did not write it next to the class. */
+  hCodeChosenBy?: { by: string; at: string };
 }
 
 export interface FlagResolution {
@@ -64,6 +66,17 @@ export interface Extraction {
       source: SourceRef;
     } | null;
     classifications: ClassificationLine[];
+    specificConcentrationLimits?: {
+      category: string;
+      lowerLimit: number | null;
+      upperLimit: number | null;
+      raw: string;
+    }[];
+    mFactorAcute?: Sourced<number>;
+    mFactorChronic?: Sourced<number>;
+    ateOral?: Sourced<number>;
+    ateDermal?: Sourced<number>;
+    ateInhalation?: Sourced<{ value: number; unit: string; form: string | null }>;
   }[];
   physicalProperties: {
     property: string;

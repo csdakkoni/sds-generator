@@ -1,0 +1,11 @@
+{
+  "name": "@sds/extract-supplier-sds",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "schema": "node --experimental-strip-types src/write-json-schema.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

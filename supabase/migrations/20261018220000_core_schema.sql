@@ -611,16 +611,17 @@ begin
       'create policy %I on public.%I for update to authenticated using (public.can_edit_org(organization_id)) with check (public.can_edit_org(organization_id))',
       t || '_update', t
     );
-    execute format(
-      'create policy %I on public.%I for delete to authenticated using (public.has_org_role(organization_id, array[''owner'', ''editor'']::public.member_role[]))',
-      t || '_delete', t
-    );
+    -- Approved revisions are never deleted (policy below); withdraw the document instead.
+    if t <> 'sds_revisions' then
+      execute format(
+        'create policy %I on public.%I for delete to authenticated using (public.has_org_role(organization_id, array[''owner'', ''editor'']::public.member_role[]))',
+        t || '_delete', t
+      );
+    end if;
   end loop;
 end;
 $$;
 
--- Approved revisions are never deleted; withdraw the document instead.
-drop policy sds_revisions_delete on public.sds_revisions;
 create policy sds_revisions_delete on public.sds_revisions
   for delete to authenticated
   using (
@@ -632,7 +633,3 @@ create policy sds_revisions_delete on public.sds_revisions
 create policy audit_log_select on public.audit_log
   for select to authenticated
   using (organization_id is not null and public.is_org_member(organization_id));
-
--- Helper functions are callable by signed-in users only.
-revoke execute on function public.create_organization(text) from public, anon;
-grant execute on function public.create_organization(text) to authenticated;

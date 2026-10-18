@@ -17,18 +17,21 @@ export interface ExtractionProvider {
   extract(request: ExtractionRequest): Promise<unknown>;
 }
 
-export type ProviderName = 'gemini';
+export type ProviderName = 'anthropic';
 
 export async function createProvider(
   name: ProviderName,
   model: string | undefined,
 ): Promise<ExtractionProvider> {
   switch (name) {
-    case 'gemini': {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
-      const { GeminiProvider } = await import('./providers/gemini.ts');
-      return new GeminiProvider(apiKey, model ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-pro');
+    case 'anthropic': {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
+      const { AnthropicProvider } = await import('./providers/anthropic.ts');
+      return new AnthropicProvider(
+        apiKey,
+        model ?? process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5',
+      );
     }
   }
 }

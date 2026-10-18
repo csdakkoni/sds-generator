@@ -2,7 +2,7 @@
  * Usage: node --experimental-strip-types src/cli.ts <pdf-folder> [--out <folder>] [--model <id>]
  *
  * Writes one <name>.json per PDF and summary.md into the output folder (default:
- * <pdf-folder>/extracted). Requires GEMINI_API_KEY.
+ * <pdf-folder>/extracted). Requires ANTHROPIC_API_KEY.
  */
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
@@ -23,7 +23,7 @@ if (!input) {
 const out = values.out ?? join(input, 'extracted');
 mkdirSync(out, { recursive: true });
 
-const provider = await createProvider('gemini', values.model);
+const provider = await createProvider('anthropic', values.model);
 const pdfs = readdirSync(input)
   .filter((f) => extname(f).toLowerCase() === '.pdf')
   .sort();

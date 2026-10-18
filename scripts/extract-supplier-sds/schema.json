@@ -1,0 +1,1122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string"
+    },
+    "pageCount": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "scanned": {
+      "description": "True when the PDF has no text layer; null if unknown",
+      "type": ["boolean", "null"]
+    },
+    "provider": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "extractedAt": {
+      "type": "string"
+    },
+    "durationMs": {
+      "type": "number"
+    },
+    "extraction": {
+      "type": "object",
+      "properties": {
+        "identity": {
+          "type": "object",
+          "properties": {
+            "tradeName": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["found", "not_stated"]
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["status", "value", "source"],
+              "additionalProperties": false,
+              "description": "Trade name. status \"not_stated\" ⇒ value and source are null."
+            },
+            "supplier": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["found", "not_stated"]
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["status", "value", "source"],
+              "additionalProperties": false,
+              "description": "Supplier company. status \"not_stated\" ⇒ value and source are null."
+            },
+            "revisionDate": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["found", "not_stated"]
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["status", "value", "source"],
+              "additionalProperties": false,
+              "description": "SDS revision date as written. status \"not_stated\" ⇒ value and source are null."
+            },
+            "revisionNumber": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["found", "not_stated"]
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["status", "value", "source"],
+              "additionalProperties": false,
+              "description": "SDS revision/version number. status \"not_stated\" ⇒ value and source are null."
+            },
+            "language": {
+              "type": "string",
+              "enum": ["tr", "en", "tr_en", "other"]
+            }
+          },
+          "required": ["tradeName", "supplier", "revisionDate", "revisionNumber", "language"],
+          "additionalProperties": false
+        },
+        "productClassification": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["classified", "not_classified", "not_stated"]
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "hazardClassAsWritten": {
+                    "type": "string",
+                    "description": "Hazard class and category exactly as written"
+                  },
+                  "category": {
+                    "description": "CLP abbreviation, e.g. \"Skin Corr. 1B\", \"Aquatic Chronic 3\"",
+                    "type": ["string", "null"]
+                  },
+                  "hCode": {
+                    "description": "e.g. \"H314\"; null if not written next to the class",
+                    "type": ["string", "null"]
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991,
+                        "description": "1-based page number in the PDF"
+                      },
+                      "quote": {
+                        "type": "string",
+                        "maxLength": 300,
+                        "description": "Short verbatim quote from the document"
+                      }
+                    },
+                    "required": ["page", "quote"],
+                    "additionalProperties": false,
+                    "description": "Where the value was read"
+                  }
+                },
+                "required": ["hazardClassAsWritten", "category", "hCode", "source"],
+                "additionalProperties": false
+              },
+              "description": "Section 2.1 classification of the raw material"
+            },
+            "statusSource": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991,
+                      "description": "1-based page number in the PDF"
+                    },
+                    "quote": {
+                      "type": "string",
+                      "maxLength": 300,
+                      "description": "Short verbatim quote from the document"
+                    }
+                  },
+                  "required": ["page", "quote"],
+                  "additionalProperties": false,
+                  "description": "Where the value was read"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": ["status", "lines", "statusSource"],
+          "additionalProperties": false
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["string", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "Chemical name. status \"not_stated\" ⇒ value and source are null."
+              },
+              "cas": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["string", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "CAS number. status \"not_stated\" ⇒ value and source are null."
+              },
+              "ec": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["string", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "EC number. status \"not_stated\" ⇒ value and source are null."
+              },
+              "registrationNumber": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["string", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "REACH/KKDİK registration number. status \"not_stated\" ⇒ value and source are null."
+              },
+              "concentration": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Lower bound in %; null if not stated"
+                      },
+                      "max": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Upper bound in %; null if not stated"
+                      },
+                      "raw": {
+                        "type": "string",
+                        "description": "As written, e.g. \"≥ 10 - < 20 %\""
+                      },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      }
+                    },
+                    "required": ["min", "max", "raw", "source"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "classifications": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "hazardClassAsWritten": {
+                      "type": "string",
+                      "description": "Hazard class and category exactly as written"
+                    },
+                    "category": {
+                      "description": "CLP abbreviation, e.g. \"Skin Corr. 1B\", \"Aquatic Chronic 3\"",
+                      "type": ["string", "null"]
+                    },
+                    "hCode": {
+                      "description": "e.g. \"H314\"; null if not written next to the class",
+                      "type": ["string", "null"]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    }
+                  },
+                  "required": ["hazardClassAsWritten", "category", "hCode", "source"],
+                  "additionalProperties": false
+                },
+                "description": "Classification of this component only"
+              },
+              "specificConcentrationLimits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "description": "CLP abbreviation, e.g. \"Skin Irrit. 2\""
+                    },
+                    "lowerLimit": {
+                      "description": "Inclusive lower limit in %",
+                      "type": ["number", "null"]
+                    },
+                    "upperLimit": {
+                      "description": "Exclusive upper limit in %; null if open-ended",
+                      "type": ["number", "null"]
+                    },
+                    "raw": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    }
+                  },
+                  "required": ["category", "lowerLimit", "upperLimit", "raw", "source"],
+                  "additionalProperties": false
+                }
+              },
+              "mFactorAcute": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["number", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "M-factor (acute). status \"not_stated\" ⇒ value and source are null."
+              },
+              "mFactorChronic": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["number", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "M-factor (chronic). status \"not_stated\" ⇒ value and source are null."
+              },
+              "ateOral": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["number", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "ATE oral, mg/kg. status \"not_stated\" ⇒ value and source are null."
+              },
+              "ateDermal": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "type": ["number", "null"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "ATE dermal, mg/kg. status \"not_stated\" ⇒ value and source are null."
+              },
+              "ateInhalation": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["found", "not_stated"]
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string"
+                          },
+                          "form": {
+                            "type": ["string", "null"]
+                          }
+                        },
+                        "required": ["value", "unit", "form"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991,
+                            "description": "1-based page number in the PDF"
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "description": "Short verbatim quote from the document"
+                          }
+                        },
+                        "required": ["page", "quote"],
+                        "additionalProperties": false,
+                        "description": "Where the value was read"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["status", "value", "source"],
+                "additionalProperties": false,
+                "description": "ATE inhalation with unit and form (gas, vapour, dust/mist). status \"not_stated\" ⇒ value and source are null."
+              }
+            },
+            "required": [
+              "name",
+              "cas",
+              "ec",
+              "registrationNumber",
+              "concentration",
+              "classifications",
+              "specificConcentrationLimits",
+              "mFactorAcute",
+              "mFactorChronic",
+              "ateOral",
+              "ateDermal",
+              "ateInhalation"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Section 3 components"
+        },
+        "physicalProperties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "property": {
+                "type": "string",
+                "enum": [
+                  "physical_state",
+                  "colour",
+                  "odour",
+                  "ph",
+                  "melting_point",
+                  "boiling_point",
+                  "flash_point",
+                  "flammability",
+                  "explosive_limits",
+                  "vapour_pressure",
+                  "density",
+                  "relative_density",
+                  "solubility",
+                  "partition_coefficient",
+                  "auto_ignition_temperature",
+                  "decomposition_temperature",
+                  "viscosity",
+                  "other"
+                ]
+              },
+              "nameAsWritten": {
+                "type": "string"
+              },
+              "value": {
+                "description": "As written; null if \"no data\" / not stated",
+                "type": ["string", "null"]
+              },
+              "numericMin": {
+                "type": ["number", "null"]
+              },
+              "numericMax": {
+                "type": ["number", "null"]
+              },
+              "unit": {
+                "type": ["string", "null"]
+              },
+              "conditions": {
+                "description": "e.g. \"20 °C\", \"1 % aqueous solution\"",
+                "type": ["string", "null"]
+              },
+              "method": {
+                "description": "Test method, e.g. \"DIN EN ISO 2719\"",
+                "type": ["string", "null"]
+              },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "1-based page number in the PDF"
+                  },
+                  "quote": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "description": "Short verbatim quote from the document"
+                  }
+                },
+                "required": ["page", "quote"],
+                "additionalProperties": false,
+                "description": "Where the value was read"
+              }
+            },
+            "required": [
+              "property",
+              "nameAsWritten",
+              "value",
+              "numericMin",
+              "numericMax",
+              "unit",
+              "conditions",
+              "method",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Section 9"
+        },
+        "transport": {
+          "type": "object",
+          "properties": {
+            "unNumber": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["found", "not_stated"]
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["status", "value", "source"],
+              "additionalProperties": false,
+              "description": "UN number. status \"not_stated\" ⇒ value and source are null."
+            },
+            "transportClass": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["found", "not_stated"]
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["status", "value", "source"],
+              "additionalProperties": false,
+              "description": "Transport hazard class. status \"not_stated\" ⇒ value and source are null."
+            },
+            "packingGroup": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["found", "not_stated"]
+                },
+                "value": {
+                  "type": ["string", "null"]
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "1-based page number in the PDF"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "maxLength": 300,
+                          "description": "Short verbatim quote from the document"
+                        }
+                      },
+                      "required": ["page", "quote"],
+                      "additionalProperties": false,
+                      "description": "Where the value was read"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["status", "value", "source"],
+              "additionalProperties": false,
+              "description": "Packing group. status \"not_stated\" ⇒ value and source are null."
+            }
+          },
+          "required": ["unNumber", "transportClass", "packingGroup"],
+          "additionalProperties": false
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Path of the field, e.g. \"components[2].concentration\""
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["ambiguous", "conflict", "unreadable", "missing_expected", "other"]
+              },
+              "message": {
+                "type": "string",
+                "description": "Turkish explanation for the reviewer"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["field", "kind", "message", "page"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "identity",
+        "productClassification",
+        "components",
+        "physicalProperties",
+        "transport",
+        "flags"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "file",
+    "pageCount",
+    "scanned",
+    "provider",
+    "model",
+    "extractedAt",
+    "durationMs",
+    "extraction"
+  ],
+  "additionalProperties": false
+}

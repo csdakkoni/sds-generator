@@ -1,0 +1,15 @@
+{
+  "name": "@sds/extract-supplier-sds",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "schema": "node --experimental-strip-types src/write-json-schema.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "extract": "node --experimental-strip-types src/cli.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  }
+}

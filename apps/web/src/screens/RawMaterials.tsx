@@ -176,7 +176,15 @@ async function uploadOne(organizationId: string, file: File): Promise<string | n
   const { error: uploadError } = await supabase.storage
     .from('supplier-sds')
     .upload(path, file, { contentType: 'application/pdf' });
-  if (uploadError) return `${file.name}: dosya yüklenemedi (${uploadError.message}).`;
+  // A failed step removes what was already created, so no empty "SDS yok" entry is left.
+  const undo = async (withFile: boolean) => {
+    if (withFile) await supabase.storage.from('supplier-sds').remove([path]);
+    await supabase.from('raw_materials').delete().eq('id', material.id);
+  };
+  if (uploadError) {
+    await undo(false);
+    return `${file.name}: dosya yüklenemedi (${uploadError.message}).`;
+  }
 
   const { error: docError } = await supabase.from('raw_material_sds_documents').insert({
     id: documentId,
@@ -185,7 +193,10 @@ async function uploadOne(organizationId: string, file: File): Promise<string | n
     storage_path: path,
     file_name: file.name,
   });
-  if (docError) return `${file.name}: kayıt oluşturulamadı (${docError.message}).`;
+  if (docError) {
+    await undo(true);
+    return `${file.name}: kayıt oluşturulamadı (${docError.message}).`;
+  }
 
   const { error: fnError } = await supabase.functions.invoke('extract-supplier-sds', {
     body: { documentId },

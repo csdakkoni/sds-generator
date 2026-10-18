@@ -2,7 +2,7 @@
  * Usage: node --experimental-strip-types src/cli.ts <pdf-folder> [--out <folder>] [--model <id>]
  *
  * Writes one <name>.json per PDF and summary.md into the output folder (default:
- * <pdf-folder>/extracted). Requires ANTHROPIC_API_KEY.
+ * <pdf-folder>/extracted). Requires SDS_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.
  */
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';

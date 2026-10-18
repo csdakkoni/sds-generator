@@ -7,6 +7,6 @@ ANTHROPIC_API_KEY=… npm run extract -w @sds/extract-supplier-sds -- ../../samp
 ```
 
 - Output format: `src/schema.ts` (Zod), exported as `schema.json` (`npm run schema`).
-- The model sits behind `ExtractionProvider` (`src/provider.ts`); the current adapter is Anthropic (Claude). The key is read from `ANTHROPIC_API_KEY`, the model from `--model` or `ANTHROPIC_MODEL` (default `claude-opus-5-5`).
+- The model sits behind `ExtractionProvider` (`src/provider.ts`); the current adapter is Anthropic (Claude). The key is read from `SDS_ANTHROPIC_API_KEY` (use this name in cloud sessions, which reserve `ANTHROPIC_API_KEY`) or `ANTHROPIC_API_KEY`, the model from `--model` or `ANTHROPIC_MODEL` (default `claude-opus-5-5`).
 - Every quote is checked against the PDF text layer (poppler `pdftotext`); mismatches and consistency problems are added as `[kontrol]` flags.
 - Put PDFs under `samples/` (git-ignored). Never commit supplier documents or their extractions.

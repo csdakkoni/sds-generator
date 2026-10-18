@@ -25,8 +25,12 @@ export async function createProvider(
 ): Promise<ExtractionProvider> {
   switch (name) {
     case 'anthropic': {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
+      // SDS_ANTHROPIC_API_KEY exists because hosted Claude Code sessions
+      // reserve ANTHROPIC_API_KEY and do not pass it to child processes.
+      const apiKey = process.env.SDS_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error('Neither SDS_ANTHROPIC_API_KEY nor ANTHROPIC_API_KEY is set');
+      }
       const { AnthropicProvider } = await import('./providers/anthropic.ts');
       return new AnthropicProvider(
         apiKey,

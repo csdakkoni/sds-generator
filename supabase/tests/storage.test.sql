@@ -50,3 +50,32 @@ select tests.expect_rows_changed('B cannot give itself a role in firm A',
   $$update public.organization_members set extra_roles = '{kdu}'
     where organization_id = (select id from tests.ids where key = 'org_a')$$, 0);
 select tests.logout();
+
+-- The upload flow: document row, components read from it, KDU approval.
+select tests.login('aaaaaaaa-0000-0000-0000-000000000001');
+with d as (
+  insert into public.raw_material_sds_documents (organization_id, raw_material_id, storage_path, file_name)
+  select (select id from tests.ids where key = 'org_a'), (select id from tests.ids where key = 'rm_a'),
+    'x/doc.pdf', 'doc.pdf'
+  returning id
+) insert into tests.ids select 'doc_a', id from d;
+select tests.expect_count('A records an uploaded SDS',
+  $$select * from public.raw_material_sds_documents where extraction_status = 'queued'$$, 1);
+select tests.expect_rows_changed('components are stored against the document',
+  $$insert into public.raw_material_components
+      (organization_id, raw_material_id, sds_document_id, name_as_written, concentration_min, concentration_max)
+    select (select id from tests.ids where key = 'org_a'), (select id from tests.ids where key = 'rm_a'),
+      (select id from tests.ids where key = 'doc_a'), 'bileşen', 10, 20$$, 1);
+select tests.expect_rows_changed('owner with KDU role approves the document',
+  $$update public.raw_material_sds_documents
+      set status = 'approved', approved_by = auth.uid(), approved_at = now()
+    where id = (select id from tests.ids where key = 'doc_a')$$, 1);
+select tests.logout();
+
+select tests.login('bbbbbbbb-0000-0000-0000-000000000001');
+select tests.expect_error('B cannot attach an SDS to A''s raw material',
+  $$insert into public.raw_material_sds_documents (organization_id, raw_material_id, storage_path, file_name)
+    select (select id from tests.ids where key = 'org_b'), (select id from tests.ids where key = 'rm_a'),
+      'x/doc.pdf', 'doc.pdf'$$,
+  'another organization');
+select tests.logout();

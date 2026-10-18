@@ -184,9 +184,11 @@ export function buildMixture(
   lines: RecipeLine[],
   materials: RecipeMaterial[],
   measurements: MeasurementRow[],
-): { input: MixtureInput; notes: EngineWarning[] } {
+): { input: MixtureInput; notes: EngineWarning[]; cas: Record<string, string | null> } {
   const notes: EngineWarning[] = [];
   const components: ComponentInput[] = [];
+  /** CAS number per engine component id, for section 3 of the SDS. */
+  const cas: Record<string, string | null> = {};
 
   for (const line of lines) {
     const material = materials.find((m) => m.id === line.raw_material_id);
@@ -261,6 +263,7 @@ export function buildMixture(
           ),
         );
       }
+      cas[`${line.id}:${i}`] = c.cas.value;
       components.push({
         id: `${line.id}:${i}`,
         name: label,
@@ -295,7 +298,7 @@ export function buildMixture(
     );
   }
 
-  return { input: { components, measurements: toMeasurements(measurements) }, notes };
+  return { input: { components, measurements: toMeasurements(measurements) }, notes, cas };
 }
 
 export interface PastedLine {

@@ -153,8 +153,13 @@ export function ClassificationView({
           <ul className="text-sm">
             {result.ate.map((a) => (
               <li key={`${a.route}-${a.form ?? ''}`}>
-                {{ oral: 'Ağız', dermal: 'Deri', inhalation: 'Soluma' }[a.route]}: {fmt(a.lower)} –{' '}
-                {fmt(a.upper)} {a.unit}
+                {{ oral: 'Ağız', dermal: 'Deri', inhalation: 'Soluma' }[a.route]}:{' '}
+                {[a.lower, a.upper]
+                  .filter((v): v is number => v !== null)
+                  .sort((x, y) => x - y)
+                  .map(fmt)
+                  .join(' – ')}{' '}
+                {a.unit}
               </li>
             ))}
           </ul>

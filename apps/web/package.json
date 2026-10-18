@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@react-pdf/renderer": "4.9.0",
     "@sds/classification-engine": "^0.0.0",
     "@supabase/supabase-js": "^2.118.0",
     "react": "^19.3.1",

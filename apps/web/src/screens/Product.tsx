@@ -11,8 +11,10 @@ import {
 } from '../lib/mixture';
 import { canEdit } from '../lib/review';
 import { supabase } from '../lib/supabase';
+import type { DataSource } from '../lib/sds/content';
 import type { Extraction, Membership } from '../lib/types';
 import { ClassificationView } from './ClassificationView';
+import { SdsPanel } from './SdsPanel';
 
 interface MaterialRow {
   id: string;
@@ -21,6 +23,8 @@ interface MaterialRow {
     status: string;
     approved_at: string | null;
     extraction: Extraction | null;
+    file_name: string;
+    revision_number: string | null;
   }[];
 }
 
@@ -29,17 +33,24 @@ interface Loaded {
   code: string | null;
   lines: (RecipeLine & { position: number })[];
   materials: MaterialRow[];
-  measurements: MeasurementRow[];
+  measurements: (MeasurementRow & { unit: string | null })[];
 }
 
 const pct = (n: number) => new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 4 }).format(n);
 const parseNumber = (s: string) => Number(s.replace(',', '.').trim());
 
-function toRecipeMaterial(m: MaterialRow): RecipeMaterial {
-  const approved = m.raw_material_sds_documents
+function approvedDocument(m: MaterialRow) {
+  return m.raw_material_sds_documents
     .filter((d) => d.status === 'approved' && d.extraction)
     .sort((a, b) => (b.approved_at ?? '').localeCompare(a.approved_at ?? ''))[0];
-  return { id: m.id, trade_name: m.trade_name, approvedExtraction: approved?.extraction ?? null };
+}
+
+function toRecipeMaterial(m: MaterialRow): RecipeMaterial {
+  return {
+    id: m.id,
+    trade_name: m.trade_name,
+    approvedExtraction: approvedDocument(m)?.extraction ?? null,
+  };
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -53,10 +64,12 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 export function Product({
   membership,
+  userId,
   productId,
   onBack,
 }: {
   membership: Membership;
+  userId: string;
   productId: string;
   onBack: () => void;
 }) {
@@ -79,12 +92,14 @@ export function Product({
         .order('position'),
       supabase
         .from('raw_materials')
-        .select('id, trade_name, raw_material_sds_documents (status, approved_at, extraction)')
+        .select(
+          'id, trade_name, raw_material_sds_documents (status, approved_at, extraction, file_name, revision_number)',
+        )
         .eq('organization_id', org)
         .order('trade_name'),
       supabase
         .from('product_measurements')
-        .select('property, value_text, numeric_min')
+        .select('property, value_text, numeric_min, unit')
         .eq('product_id', productId),
     ]).then(([p, l, m, ms]) => {
       if (!active) return;
@@ -98,7 +113,7 @@ export function Product({
         code: p.data?.code ?? null,
         lines: (l.data ?? []) as Loaded['lines'],
         materials: (m.data ?? []) as MaterialRow[],
-        measurements: (ms.data ?? []) as MeasurementRow[],
+        measurements: (ms.data ?? []) as Loaded['measurements'],
       });
     });
     return () => {
@@ -108,12 +123,40 @@ export function Product({
 
   const computed = useMemo(() => {
     if (!data || data.lines.length === 0) return null;
-    const { input, notes } = buildMixture(
+    const mixture = buildMixture(
       data.lines,
       data.materials.map(toRecipeMaterial),
       data.measurements,
     );
-    return { result: classifyMixture(input), notes };
+    // The supplier SDS revisions the result rests on, for section 16 and the revision record.
+    const used = new Set(data.lines.map((l) => l.raw_material_id));
+    const dataSources: DataSource[] = data.materials
+      .filter((m) => used.has(m.id))
+      .flatMap((m) => {
+        const d = approvedDocument(m);
+        return d
+          ? [
+              {
+                rawMaterial: m.trade_name,
+                fileName: d.file_name,
+                supplierRevision: d.revision_number,
+                approvedAt: d.approved_at,
+              },
+            ]
+          : [];
+      });
+    const measurements = data.measurements.map((m) => ({
+      property: m.property,
+      value_text: m.value_text,
+      unit: m.unit,
+    }));
+    return {
+      result: classifyMixture(mixture.input),
+      notes: mixture.notes,
+      mixture,
+      dataSources,
+      measurements,
+    };
   }, [data]);
 
   async function addLines(lines: { rawMaterialId: string; min: number; max: number }[]) {
@@ -286,6 +329,21 @@ export function Product({
           </Card>
         </div>
       </div>
+
+      {computed && (
+        <Card title="Güvenlik bilgi formu (SDS)">
+          <SdsPanel
+            membership={membership}
+            userId={userId}
+            productId={productId}
+            product={{ name: data.name, code: data.code }}
+            mixture={computed.mixture}
+            result={computed.result}
+            measurements={computed.measurements}
+            dataSources={computed.dataSources}
+          />
+        </Card>
+      )}
     </div>
   );
 }

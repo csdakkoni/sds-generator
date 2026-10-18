@@ -143,7 +143,7 @@ export type Extraction = z.infer<typeof Extraction>;
 export const ExtractionFile = z.object({
   file: z.string(),
   pageCount: z.number().int(),
-  scanned: z.boolean().describe('True when the PDF has no text layer'),
+  scanned: z.boolean().nullable().describe('True when the PDF has no text layer; null if unknown'),
   provider: z.string(),
   model: z.string(),
   extractedAt: z.string(),

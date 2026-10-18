@@ -11,8 +11,8 @@
       "maximum": 9007199254740991
     },
     "scanned": {
-      "type": "boolean",
-      "description": "True when the PDF has no text layer"
+      "description": "True when the PDF has no text layer; null if unknown",
+      "type": ["boolean", "null"]
     },
     "provider": {
       "type": "string"

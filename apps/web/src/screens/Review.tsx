@@ -1,3 +1,4 @@
+import { hCodeOptions, isHazardCategory } from '@sds/classification-engine';
 import { useCallback, useEffect, useState } from 'react';
 import { canEdit, FLAG_KIND, hasRole, openFlags } from '../lib/review';
 import { supabase } from '../lib/supabase';
@@ -31,7 +32,49 @@ function PageLink({
   );
 }
 
-function HazardChip({ line, onShow }: { line: ClassificationLine; onShow: (p: number) => void }) {
+/** Statements the KDU can pick when the SDS lists a category without its H code. */
+function pickableCodes(line: ClassificationLine): string[] {
+  const category = line.category?.trim();
+  if (line.hCode || !category || !isHazardCategory(category)) return [];
+  const options = hCodeOptions(category);
+  return options.length > 1 ? options : [];
+}
+
+function HCodePicker({
+  line,
+  onPick,
+}: {
+  line: ClassificationLine;
+  onPick: ((code: string) => void) | null;
+}) {
+  const options = pickableCodes(line);
+  if (!onPick || options.length === 0) return null;
+  return (
+    <select
+      aria-label={`${line.category} için H kodu`}
+      defaultValue=""
+      onChange={(e) => e.target.value && onPick(e.target.value)}
+      className="rounded-md border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs"
+    >
+      <option value="">H kodu seç…</option>
+      {options.map((code) => (
+        <option key={code} value={code}>
+          {code}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function HazardChip({
+  line,
+  onShow,
+  onPick,
+}: {
+  line: ClassificationLine;
+  onShow: (p: number) => void;
+  onPick: ((code: string) => void) | null;
+}) {
   return (
     <li className="flex items-center gap-2 rounded-md border border-slate-200 py-1.5 pr-3 pl-1.5">
       {line.hCode ? (
@@ -50,6 +93,7 @@ function HazardChip({ line, onShow }: { line: ClassificationLine; onShow: (p: nu
         <b className="text-sm">{line.category ?? line.hazardClassAsWritten}</b>
         <PageLink page={line.source.page} onShow={onShow} />
       </span>
+      <HCodePicker line={line} onPick={onPick} />
     </li>
   );
 }
@@ -127,6 +171,24 @@ export function Review({
       .eq('id', doc.id);
     if (saveError) setError(saveError.message);
     else setDoc({ ...doc, flags });
+  }
+
+  /** Records the KDU's choice of H code for a line the SDS listed without one. */
+  async function setHCode(component: number | null, index: number, code: string) {
+    if (!doc?.extraction) return;
+    const x = structuredClone(doc.extraction);
+    const lines =
+      component === null ? x.productClassification.lines : x.components[component]?.classifications;
+    const target = lines?.[index];
+    if (!target) return;
+    target.hCode = code;
+    target.hCodeChosenBy = { by: userId, at: new Date().toISOString() };
+    const { error: saveError } = await supabase
+      .from('raw_material_sds_documents')
+      .update({ extraction: x })
+      .eq('id', doc.id);
+    if (saveError) setError(saveError.message);
+    else setDoc({ ...doc, extraction: x });
   }
 
   function resolve(index: number, status: 'accepted' | 'needs_fix' | null) {
@@ -253,7 +315,12 @@ export function Review({
                       <li className="text-sm text-slate-500">Sınıflandırma satırı yok</li>
                     )}
                     {x.productClassification.lines.map((l, i) => (
-                      <HazardChip key={i} line={l} onShow={setPage} />
+                      <HazardChip
+                        key={i}
+                        line={l}
+                        onShow={setPage}
+                        onPick={isKdu ? (code) => void setHCode(null, i, code) : null}
+                      />
                     ))}
                   </ul>
                 </section>
@@ -284,9 +351,26 @@ export function Review({
                               <PageLink page={c.concentration?.source.page} onShow={setPage} />
                             </td>
                             <td className="py-2 text-slate-600">
-                              {c.classifications
-                                .map((l) => l.category ?? l.hazardClassAsWritten)
-                                .join(', ') || '—'}
+                              {c.classifications.length === 0 && '—'}
+                              <ul className="grid gap-1">
+                                {c.classifications.map((l, j) => (
+                                  <li key={j} className="flex flex-wrap items-center gap-1.5">
+                                    <span>
+                                      {l.category ?? l.hazardClassAsWritten}
+                                      {l.hCode && (
+                                        <span className="ml-1 font-mono text-xs text-slate-500">
+                                          {l.hCode}
+                                          {l.hCodeChosenBy && ' (KDU seçti)'}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <HCodePicker
+                                      line={l}
+                                      onPick={isKdu ? (code) => void setHCode(i, j, code) : null}
+                                    />
+                                  </li>
+                                ))}
+                              </ul>
                             </td>
                           </tr>
                         ))}

@@ -106,3 +106,19 @@ export function acuteRouteOf(hCode: string): AcuteRoute | null {
   }
   return null;
 }
+
+/**
+ * Hazard statements a component line of this category can carry: one fixed statement for
+ * most categories; the route-specific ones for acute toxicity (CLP Table 3.1.3) and H335 or
+ * H336 for STOT SE 3 (CLP Table 3.8.4). Used where a supplier SDS lists a category without
+ * its H code, so the KDU picks the statement instead of the system guessing it.
+ */
+export function hCodeOptions(category: HazardCategory): string[] {
+  const info = INFO[category];
+  if (info.hCode) return [info.hCode];
+  if (info.hazardClass === 'acute_toxicity') {
+    const n = (info.rank + 1) as 1 | 2 | 3 | 4;
+    return (['oral', 'dermal', 'inhalation'] as const).map((route) => acuteHCode(route, n));
+  }
+  return ['H335', 'H336'];
+}

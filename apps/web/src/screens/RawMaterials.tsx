@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { canEdit, materialState, nameFromFile, type MaterialState } from '../lib/review';
+import { canEdit, hasRole, materialState, nameFromFile, type MaterialState } from '../lib/review';
 import { supabase } from '../lib/supabase';
 import type { Membership, RawMaterial } from '../lib/types';
 
@@ -34,6 +34,7 @@ export function RawMaterials({
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string[]>([]);
   const editable = canEdit(membership);
+  const canDelete = hasRole(membership, 'owner') || hasRole(membership, 'editor');
 
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
@@ -62,6 +63,26 @@ export function RawMaterials({
     const timer = setInterval(reload, 5000);
     return () => clearInterval(timer);
   }, [reading, reload]);
+
+  async function remove(m: RawMaterial) {
+    if (!window.confirm(`"${m.trade_name}" silinsin mi?`)) return;
+    setError(null);
+    const { data, error: deleteError } = await supabase
+      .from('raw_materials')
+      .delete()
+      .eq('id', m.id)
+      .select('id');
+    if (deleteError) {
+      setError(
+        deleteError.code === '23503'
+          ? `${m.trade_name}: bir ürün reçetesinde kullanıldığı için silinemez.`
+          : `${m.trade_name} silinemedi: ${deleteError.message}`,
+      );
+    } else if (!data?.length) {
+      setError(`${m.trade_name} silinemedi: bu işlem için yetkin yok.`);
+    }
+    reload();
+  }
 
   async function upload(files: FileList | null) {
     if (!files) return;
@@ -133,27 +154,41 @@ export function RawMaterials({
         )}
         {items?.map((m) => {
           const doc = m.raw_material_sds_documents[0];
+          const state = materialState(m);
           return (
-            <button
+            <div
               key={m.id}
-              type="button"
-              onClick={() => onOpen(m.id)}
-              className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-slate-50"
+              className="flex items-center border-b border-slate-100 last:border-0 hover:bg-slate-50"
             >
-              <span className="min-w-0">
-                <b className="block truncate">{m.trade_name}</b>
-                <small className="text-slate-500">
-                  {[
-                    m.supplier_name,
-                    doc?.revision_number && `sürüm ${doc.revision_number}`,
-                    doc?.revision_date,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || 'Tedarikçi SDS'}
-                </small>
-              </span>
-              <StatePill state={materialState(m)} />
-            </button>
+              <button
+                type="button"
+                onClick={() => onOpen(m.id)}
+                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
+              >
+                <span className="min-w-0">
+                  <b className="block truncate">{m.trade_name}</b>
+                  <small className="text-slate-500">
+                    {[
+                      m.supplier_name,
+                      doc?.revision_number && `sürüm ${doc.revision_number}`,
+                      doc?.revision_date,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'Tedarikçi SDS'}
+                  </small>
+                </span>
+                <StatePill state={state} />
+              </button>
+              {canDelete && state.kind === 'no_document' && (
+                <button
+                  type="button"
+                  onClick={() => void remove(m)}
+                  className="mr-4 text-xs text-red-700 underline"
+                >
+                  Sil
+                </button>
+              )}
+            </div>
           );
         })}
       </section>

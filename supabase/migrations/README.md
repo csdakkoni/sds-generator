@@ -1,1 +1,2 @@
-Schema and RLS migrations, added in step 3. Every table has RLS enabled.
+Schema and RLS migrations. Every table has RLS enabled; `supabase/tests/` checks that one
+firm's members cannot read or change another firm's data.

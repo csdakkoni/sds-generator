@@ -7,7 +7,8 @@
     "schema": "node --experimental-strip-types src/write-json-schema.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "extract": "node --experimental-strip-types src/cli.ts"
+    "extract": "node --experimental-strip-types src/cli.ts",
+    "sync:edge": "node --experimental-strip-types sync-edge.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0"

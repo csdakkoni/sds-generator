@@ -9,6 +9,7 @@ import { Product } from './screens/Product';
 import { Products } from './screens/Products';
 import { RawMaterials } from './screens/RawMaterials';
 import { Review } from './screens/Review';
+import { SdsList } from './screens/SdsList';
 
 /** Routes live in the hash so the static host needs no server rewrites. */
 function useHashRoute(): [string, (route: string) => void] {
@@ -65,7 +66,11 @@ export function App() {
 
   const reviewId = route.match(/^\/hammaddeler\/([0-9a-f-]{36})$/)?.[1];
   const productId = route.match(/^\/urunler\/([0-9a-f-]{36})$/)?.[1];
-  const section = route.startsWith('/urunler') ? 'urunler' : 'hammaddeler';
+  const section = route.startsWith('/urunler')
+    ? 'urunler'
+    : route.startsWith('/sds')
+      ? 'sds'
+      : 'hammaddeler';
   const tab = (active: boolean) =>
     `rounded-md px-3 py-1.5 ${active ? 'bg-sky-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`;
   const roleLabel = hasRole(membership, 'kdu')
@@ -92,9 +97,9 @@ export function App() {
             <a href="#/urunler" className={tab(section === 'urunler')}>
               Ürünler
             </a>
-            <span className="rounded-md px-3 py-1.5 text-slate-400" title="Sonraki adımda gelecek">
+            <a href="#/sds" className={tab(section === 'sds')}>
               SDS'ler
-            </span>
+            </a>
           </nav>
           <span className="ml-auto flex items-center gap-3 text-sm text-slate-500">
             <span className="hidden sm:inline">
@@ -114,9 +119,12 @@ export function App() {
         {productId ? (
           <Product
             membership={membership}
+            userId={session.user.id}
             productId={productId}
             onBack={() => navigate('/urunler')}
           />
+        ) : section === 'sds' ? (
+          <SdsList membership={membership} onOpen={(id) => navigate(`/urunler/${id}`)} />
         ) : section === 'urunler' ? (
           <Products membership={membership} onOpen={(id) => navigate(`/urunler/${id}`)} />
         ) : reviewId ? (

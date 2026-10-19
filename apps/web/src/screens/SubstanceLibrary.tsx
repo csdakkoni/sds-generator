@@ -14,6 +14,7 @@ const PAGE = 50;
 /** Read-only view of the global substance library, searchable by name, CAS, EC or list number. */
 export function SubstanceLibrary() {
   const [query, setQuery] = useState('');
+  const [shown, setShown] = useState(PAGE);
   const [rows, setRows] = useState<Substance[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function SubstanceLibrary() {
       .from('substances')
       .select('list_no, name, synonyms, ec_number, cas_number')
       .order('list_no', { nullsFirst: false })
-      .limit(PAGE);
+      .limit(shown);
     if (term) {
       request = request.or(
         `name.ilike.%${term}%,cas_number.ilike.%${term}%,ec_number.ilike.%${term}%,list_no.ilike.%${term}%`,
@@ -58,7 +59,7 @@ export function SubstanceLibrary() {
     return () => {
       active = false;
     };
-  }, [query, total]);
+  }, [query, shown, total]);
 
   return (
     <section className="grid gap-3">
@@ -71,7 +72,11 @@ export function SubstanceLibrary() {
       <input
         type="search"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          // A new search starts again from the first page.
+          setQuery(e.target.value);
+          setShown(PAGE);
+        }}
         placeholder="Ad, CAS, EC veya liste no ile ara"
         className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
       />
@@ -107,10 +112,14 @@ export function SubstanceLibrary() {
           <p className="px-3 py-4 text-sm text-slate-500">Eşleşen madde yok.</p>
         )}
       </div>
-      {rows.length === PAGE && (
-        <p className="text-xs text-slate-500">
-          İlk {PAGE} sonuç gösteriliyor. Daha dar bir arama yap.
-        </p>
+      {rows.length === shown && (
+        <button
+          type="button"
+          onClick={() => setShown((n) => n + PAGE)}
+          className="justify-self-start rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:border-sky-300"
+        >
+          Daha fazla göster
+        </button>
       )}
     </section>
   );

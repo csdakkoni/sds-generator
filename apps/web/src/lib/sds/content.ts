@@ -52,6 +52,7 @@ export type SectionTextKey = (typeof SECTION_TEXT_KEYS)[number];
 
 export interface CompositionLine {
   name: string;
+  ec: string | null;
   cas: string | null;
   /** Share of the mixture in %, both bounds kept. */
   min: number;
@@ -224,7 +225,12 @@ export function composeContent(args: {
   company: CompanyInfo;
   inputs: SdsInputs;
   measurements: SdsContent['measurements'];
-  mixture: { input: MixtureInput; notes: EngineWarning[]; cas: Record<string, string | null> };
+  mixture: {
+    input: MixtureInput;
+    notes: EngineWarning[];
+    cas: Record<string, string | null>;
+    ec: Record<string, string | null>;
+  };
   result: ClassificationResult;
   dataSources: DataSource[];
 }): SdsContent {
@@ -236,6 +242,7 @@ export function composeContent(args: {
     measurements: [...args.measurements].sort((a, b) => a.property.localeCompare(b.property)),
     composition: args.mixture.input.components.map((c) => ({
       name: c.name,
+      ec: args.mixture.ec[c.id] ?? null,
       cas: args.mixture.cas[c.id] ?? null,
       min: c.concentration.min,
       max: c.concentration.max,

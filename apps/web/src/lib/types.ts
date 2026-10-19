@@ -59,6 +59,8 @@ export interface Extraction {
   components: {
     name: Sourced<string>;
     cas: Sourced<string>;
+    /** EC number as written in the supplier SDS, when it has one (older extractions may lack it). */
+    ec?: Sourced<string>;
     concentration: {
       min: number | null;
       max: number | null;

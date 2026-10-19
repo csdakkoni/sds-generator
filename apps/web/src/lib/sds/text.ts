@@ -545,12 +545,14 @@ export function buildSections(
           kind: 'table',
           head: [
             L('Bileşen', 'Ingredient'),
+            'EC',
             'CAS',
             L('Oran', 'Concentration'),
             L('Sınıflandırma', 'Classification'),
           ],
           rows: hazardous.map((c) => [
             c.name,
+            c.ec ?? '—',
             c.cas ?? '—',
             range(lang, c.min, c.max),
             c.classifications.map((k) => `${k.category}, ${k.hCode}`).join('; '),

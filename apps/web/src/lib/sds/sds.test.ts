@@ -112,6 +112,20 @@ describe('SDS sections', () => {
     expect(allText(c, 'en')).toContain('H318');
   });
 
+  it('shows the EC number next to the CAS number in section 3', () => {
+    const c = content();
+    const [line] = c.composition;
+    if (!line) throw new Error('no composition lines');
+    line.ec = '231-102-5';
+    const section3 = buildSections(c, 'en', revision, defaults(c, 'en')).find(
+      (s) => s.number === 3,
+    );
+    const table = section3?.blocks.find((b) => b.kind === 'table');
+    if (table?.kind !== 'table') throw new Error('section 3 has no composition table');
+    expect(table.head.slice(0, 3)).toEqual(['Ingredient', 'EC', 'CAS']);
+    expect(table.rows[0]?.slice(0, 3)).toEqual([line.name, '231-102-5', line.cas ?? '—']);
+  });
+
   it('prints no fixed sentence unrelated to the product and no "generated automatically" note (rule 12)', () => {
     const c = content();
     for (const lang of ['tr', 'en'] as const) {

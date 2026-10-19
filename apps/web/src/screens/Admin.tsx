@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { RegulationWatch } from './RegulationWatch';
 import { SubstanceLibrary } from './SubstanceLibrary';
 
 interface Ek6File {
@@ -156,6 +157,8 @@ export function Admin() {
           Yazıldı: {written.created} yeni, {written.updated} güncellenen kayıt.
         </p>
       )}
+
+      <RegulationWatch />
 
       <SubstanceLibrary />
     </div>

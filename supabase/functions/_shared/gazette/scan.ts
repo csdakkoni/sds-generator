@@ -66,8 +66,8 @@ function matchedKeywords(text: string, keywords: readonly string[]): string[] {
 export function dailyIndexUrl(template: string, date: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) throw new Error(`invalid date: ${date}`);
-  const [, yyyy, mm, dd] = match;
-  return template.replaceAll('{YYYY}', yyyy!).replaceAll('{MM}', mm!).replaceAll('{DD}', dd!);
+  const [, yyyy = '', mm = '', dd = ''] = match;
+  return template.replaceAll('{YYYY}', yyyy).replaceAll('{MM}', mm).replaceAll('{DD}', dd);
 }
 
 export function scanDailyIndex(
@@ -99,7 +99,7 @@ export function scanDailyIndex(
   const text = stripTags(html);
   const hits = matchedKeywords(text, keywords);
   if (hits.length === 0) return [];
-  const first = hits[0]!;
+  const first = hits[0] ?? '';
   const at = fold(text).indexOf(fold(first));
   const start = Math.max(0, at - 120);
   return [

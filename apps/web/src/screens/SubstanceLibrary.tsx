@@ -34,18 +34,11 @@ export function SubstanceLibrary() {
 
   useEffect(() => {
     let active = true;
-    // Commas and parentheses would break the PostgREST filter, so they are dropped from the search.
-    const term = query.trim().replace(/[,()]/g, '');
-    let request = supabase
-      .from('substances')
-      .select('list_no, name, synonyms, ec_number, cas_number')
-      .order('list_no', { nullsFirst: false })
-      .limit(shown);
-    if (term) {
-      request = request.or(
-        `name.ilike.%${term}%,cas_number.ilike.%${term}%,ec_number.ilike.%${term}%,list_no.ilike.%${term}%`,
-      );
-    }
+    // The search runs in the database so it also matches the Turkish name (in synonyms)
+    // and ignores Turkish case and diacritics.
+    const request = supabase
+      .rpc('search_substances', { q: query.trim(), max_rows: shown })
+      .select('list_no, name, synonyms, ec_number, cas_number');
     void request.then(({ data, error: loadError }) => {
       if (!active) return;
       if (loadError) {

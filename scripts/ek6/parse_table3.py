@@ -28,6 +28,10 @@ for k in range(1, len(parts), 2):
                 pos = i; rec['layout'] = 'scan'; break
     if pos is not None:
         ec, cas = cells[pos], cells[pos + 1]
+        # Source text kept as written: the "Notlar" cell (letters such as A, C, J, P) and the
+        # last column (special concentration limits, M-factors, ATEs). Not interpreted here.
+        rec['note'] = cells[pos - 1] if pos >= 1 else ''
+        rec['scl_m_text'] = cells[pos + 7] if len(cells) > pos + 7 else ''
         # A group entry lists several numbered substances; their numbers are kept as lists.
         rec['ec_list'] = ONE_EC.findall(ec)
         rec['cas_list'] = ONE_CAS.findall(cas)

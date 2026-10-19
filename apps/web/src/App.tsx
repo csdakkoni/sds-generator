@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { hasRole } from './lib/review';
 import { supabase } from './lib/supabase';
 import type { Membership } from './lib/types';
+import { Admin } from './screens/Admin';
 import { AuthScreen } from './screens/AuthScreen';
 import { CreateOrganization } from './screens/CreateOrganization';
 import { Product } from './screens/Product';
@@ -34,7 +35,19 @@ export function App() {
   }, []);
 
   const [membershipVersion, setMembershipVersion] = useState(0);
+  const [platformAdmin, setPlatformAdmin] = useState(false);
   const userId = session?.user.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    void supabase.rpc('is_platform_admin').then(({ data }) => {
+      if (active) setPlatformAdmin(data === true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -70,7 +83,9 @@ export function App() {
     ? 'urunler'
     : route.startsWith('/sds')
       ? 'sds'
-      : 'hammaddeler';
+      : route.startsWith('/yonetim')
+        ? 'yonetim'
+        : 'hammaddeler';
   const tab = (active: boolean) =>
     `rounded-md px-3 py-1.5 ${active ? 'bg-sky-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`;
   const roleLabel = hasRole(membership, 'kdu')
@@ -100,6 +115,11 @@ export function App() {
             <a href="#/sds" className={tab(section === 'sds')}>
               SDS'ler
             </a>
+            {platformAdmin && (
+              <a href="#/yonetim" className={tab(section === 'yonetim')}>
+                Yönetim
+              </a>
+            )}
           </nav>
           <span className="ml-auto flex items-center gap-3 text-sm text-slate-500">
             <span className="hidden sm:inline">
@@ -123,6 +143,8 @@ export function App() {
             productId={productId}
             onBack={() => navigate('/urunler')}
           />
+        ) : section === 'yonetim' && platformAdmin ? (
+          <Admin />
         ) : section === 'sds' ? (
           <SdsList membership={membership} onOpen={(id) => navigate(`/urunler/${id}`)} />
         ) : section === 'urunler' ? (

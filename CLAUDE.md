@@ -23,16 +23,72 @@ Temel vaat: "Hammadde SDS klasörünü ve reçete Excel'ini yükle; sistem hamma
 
 - Her veri bir `organization`a aittir. Erişim Postgres RLS kurallarıyla firma üyeliğine göre sınırlandırılır; istemci tarafı filtre güvenlik sayılmaz.
 - Roller: owner, editor, kdu (onay yetkili), viewer.
-- Ortak (global) madde havuzu yalnızca saf madde verisi içerir; hangi firmanın hangi hammaddeyi kullandığı bilgisi asla ortak alana taşınmaz.
+- Ortak (global) madde havuzu yalnızca saf madde verisi içerir; hangi firmanın hangi hammaddeyi kullandığı bilgisi asla ortak alana taşınmaz. Havuza giriş koşulları için "Madde kütüphanesi ve kaynak katmanları" bölümüne bak.
 
 ## Veri kaynakları ve öncelik
+
+Aşağıdaki liste kaynakların rolünü özetler. Kaynak katmanları (source_type), profil kuralları ve ortak havuz için "Madde kütüphanesi ve kaynak katmanları" bölümü geçerlidir.
 
 1. **SEA Yönetmeliği Ek-6** (harmonize sınıflandırma), Resmî Gazete'deki resmi metinden. Yalnızca listelenen tehlike sınıfları için bağlayıcıdır; listelenmeyen sınıflar ayrıca değerlendirilir.
 2. **Hammadde tedarikçisinin SDS'i**: yapay zekâ ile okunur, her değer sayfa numarası ve kaynak metin alıntısıyla saklanır, uzman onayından sonra kullanılır.
 3. **Karışıma ait ölçülmüş veriler** (parlama noktası, pH, yoğunluk vb.): laboratuvar sonucu olarak girilir.
 4. **PubChem**: yalnızca kimlik eşleştirme (CAS, isim, eş anlamlılar) ve araştırma desteği. Sınıflandırma kaynağı olarak kullanılmaz.
 
-Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kısıtı var), IFA GESTIS (ticari aktarım yasak), C&L envanterindeki "çoğunluk bildirimi".
+Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kısıtı var), IFA GESTIS (ticari aktarım yasak), C&L envanterindeki "çoğunluk bildirimi". PubChem yalnızca `research_note` olarak görünebilir ve hesaba girmez (bkz. kütüphane bölümü).
+
+## Madde kütüphanesi ve kaynak katmanları
+
+- Bir maddenin kimliği (CAS, EC, Index No, isimler) tektir. Sınıflandırma kayıtları ayrıdır ve aynı CAS için birden çok profil olabilir (1:N).
+- Profil seçim alanları: EO/PO derecesi, karbon zinciri, aktif madde aralığı, safsızlık koşulları.
+- Her sınıflandırma kaydında: `jurisdiction` (şimdilik yalnızca TR), `regulation`, `source_type`, `source_reference` (belge, sayfa, satır), `data_license`, `effective_from`, `effective_to`, `verification_status`, `verified_by`, `verified_at`.
+- `source_type` değerleri:
+  - `harmonised`: SEA Ek-6. Kilitli; KDU listelenen tehlike sınıflarını düşüremez. Listelenmeyen sınıflar ayrıca değerlendirilir.
+  - `industry_guidance`: CESIO gibi sektör rehberleri; profil olarak önerilir.
+  - `expert_rule`: KDU'nun yazdığı koşullu profiller. Koşul ve gerekçe zorunlu (ör. PDMS: "D4, D5, D6 her biri < %0,1 ise sınıflandırılmaz").
+  - `shared_pool`: anonim CAS + sınıflandırma + koşul profilleri.
+  - `supplier_sds`: firmaya özel ticari grade bilgisi.
+  - `research_note`: PubChem ve diğer araştırma kaynakları (C&L çoğunluk bildirimi hariç). Otomatik hesaba asla girmez.
+- Ortak havuz: bir profil 3 farklı firmada görüldüğünde VEYA platform KDU'su onayladığında anonim olarak ortak havuza girer. Ticari ad, tedarikçi adı ve firma bilgisi asla taşınmaz. TODO: Kullanım koşullarına müşteri onayı maddesi eklenecek.
+- Araştırma notunda "Taslağa aktar" düğmesi bulunur. KDU onaylarsa kaynak "expert_assessed (research_note referanslı)" olarak kaydedilir.
+- Tedarikçi SDS'i yüklendiğinde mevcut profille karşılaştırılır. Tutarlıysa tek tıkla onay önerilir, farklıysa yalnızca farklar gösterilir.
+- Lisansı netleşmemiş kaynaklar (CESIO dahil) `data_license=unverified` ile işaretlenir ve netleşene kadar yalnızca geliştirme ortamında kullanılır. TODO: Şu an ayrı bir geliştirme ortamı yok (tek Supabase projesi var); CESIO aktarımından önce nerede tutulacağı belirlenecek.
+- ECHA CHEM'den sistematik veri çekme (scraping) yapılmaz. ECHA'nın Ek VI Excel'i ve üçüncü taraf mevzuat kopyaları ürün veritabanına aktarılmaz.
+
+## Çoklu mevzuat
+
+- Sistem mevzuat profilleriyle çalışır. Şimdilik yalnızca TR (SEA + KKDİK Ek-2) uygulanır. Veri modeli ve motor arayüzü ileride EU-CLP gibi profillerin eklenebileceği şekilde tasarlanır; bunlar şimdi geliştirilmez.
+
+## Belge okuma kuralları
+
+- H, P ve EUH ifadelerinin yalnızca kodu çıkarılır; metin her zaman veritabanındaki resmi ifade tablosundan gelir.
+- Değerler orijinal dilinde ve orijinal haliyle çıkarılır; çeviri ayrı adımdır.
+- ≤, ≥, <, > işaretleri ve birimler ayrı alanlarda korunur.
+- CAS numaraları kontrol hanesiyle doğrulanır; tutmayanlar işaretlenir.
+- Piktogramlar sınıflandırmadan türetilir; belgeden okunan piktogram yalnızca tutarlılık kontrolü içindir.
+
+## Kullanıcı deneyimi ilkeleri
+
+1. Onay hammadde başına bir kez verilir; onaylanan hammadde onu kullanan tüm ürünlerde yeniden sorulmaz.
+2. Sınıflandırma kararlarını yalnızca KDU rolü görür ve onaylar. Diğer roller yalnızca sonuçları ve belgeleri görür.
+3. Kontrol bekleyen her şey tek bir "KDU kontrol listesi"nde toplanır.
+4. Bekleyen bir kontrol işi durdurmaz: taslak SDS her zaman üretilir, yalnızca "kesinleşti" durumu KDU onayına bağlıdır. Taslakta neyin beklediği açıkça yazar.
+5. Otomatik eşleşen ve tutarlı kayıtlar kontrol listesine düşmez.
+6. Ürün ekranında her hammaddenin yanında kaynağı tek etiketle görünür (SEA Ek-6, CESIO profili, onaylı havuz, KDU kontrolünde).
+7. Toplu işlemler önceliklidir: toplu SDS yükleme, toplu onay, etkilenen ürünlerin toplu revizyonu.
+
+## Mevzuat güncelleme süreci
+
+- Değişiklik tespiti otomatik, yorum ve uygulama insan onaylıdır. Sistem hiçbir mevzuat değişikliğini kendi başına uygulamaz.
+- Her import bir `regulation_versions` kaydı oluşturur (kaynak belge, Resmî Gazete tarihi/sayısı, yürürlük tarihi, geçiş süresi). Eski kayıtlar silinmez, `effective_to` ile kapatılır.
+- Yeni sürüm yüklendiğinde etki analizi yapılır; sınıflandırması değişen ürünler için taslak revizyonlar toplu iş olarak KDU listesine düşer.
+
+## Açık kararlar (TODO)
+
+- Karar (2026-10-19, erdem): ECHA C&L "çoğunluk bildirimi" hiçbir biçimde gösterilmez; `research_note` olarak da girmez.
+- Karar (2026-10-19, erdem): Mevcut onaylı profille tutarlı tedarikçi SDS'i için hammadde ekranında tek tıkla onay istenir (kontrol listesine düşmez, onaysız da kullanılmaz).
+- Karar (2026-10-19, erdem): Aynı CAS için `harmonised` dışındaki profiller çelişirse sistem seçim yapmaz; çelişki KDU kontrol listesine düşer.
+- TODO: Kullanım koşullarına müşteri onayı maddesi (ortak havuz).
+- TODO: Ayrı geliştirme ortamı (lisansı belirsiz kaynaklar için).
 
 ## Değiştirilemez kurallar
 

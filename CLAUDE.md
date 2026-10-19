@@ -34,7 +34,7 @@ Aşağıdaki liste kaynakların rolünü özetler. Kaynak katmanları (source_ty
 3. **Karışıma ait ölçülmüş veriler** (parlama noktası, pH, yoğunluk vb.): laboratuvar sonucu olarak girilir.
 4. **PubChem**: yalnızca kimlik eşleştirme (CAS, isim, eş anlamlılar) ve araştırma desteği. Sınıflandırma kaynağı olarak kullanılmaz.
 
-Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kısıtı var), IFA GESTIS (ticari aktarım yasak), C&L envanterindeki "çoğunluk bildirimi". ECHA C&L ve PubChem yalnızca `research_note` olarak görünebilir ve hesaba girmez (bkz. kütüphane bölümü).
+Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kısıtı var), IFA GESTIS (ticari aktarım yasak), C&L envanterindeki "çoğunluk bildirimi". PubChem yalnızca `research_note` olarak görünebilir ve hesaba girmez (bkz. kütüphane bölümü).
 
 ## Madde kütüphanesi ve kaynak katmanları
 
@@ -47,7 +47,7 @@ Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kıs
   - `expert_rule`: KDU'nun yazdığı koşullu profiller. Koşul ve gerekçe zorunlu (ör. PDMS: "D4, D5, D6 her biri < %0,1 ise sınıflandırılmaz").
   - `shared_pool`: anonim CAS + sınıflandırma + koşul profilleri.
   - `supplier_sds`: firmaya özel ticari grade bilgisi.
-  - `research_note`: ECHA C&L ve PubChem. Otomatik hesaba asla girmez.
+  - `research_note`: PubChem ve diğer araştırma kaynakları (C&L çoğunluk bildirimi hariç). Otomatik hesaba asla girmez.
 - Ortak havuz: bir profil 3 farklı firmada görüldüğünde VEYA platform KDU'su onayladığında anonim olarak ortak havuza girer. Ticari ad, tedarikçi adı ve firma bilgisi asla taşınmaz. TODO: Kullanım koşullarına müşteri onayı maddesi eklenecek.
 - Araştırma notunda "Taslağa aktar" düğmesi bulunur. KDU onaylarsa kaynak "expert_assessed (research_note referanslı)" olarak kaydedilir.
 - Tedarikçi SDS'i yüklendiğinde mevcut profille karşılaştırılır. Tutarlıysa tek tıkla onay önerilir, farklıysa yalnızca farklar gösterilir.
@@ -84,9 +84,9 @@ Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kıs
 
 ## Açık kararlar (TODO)
 
-- TODO(KDU): Kaynak öncelik sırası belirsiz. Aynı CAS için `harmonised` dışındaki profiller (`expert_rule`, `industry_guidance`, `supplier_sds`, `shared_pool`) çeliştiğinde hangisinin önerildiği veya hangisinin geçerli olduğu tanımlanmadı. Çözülene kadar çelişki KDU kontrol listesine düşer, motor kendi başına seçim yapmaz.
-- TODO(KDU): ECHA C&L'deki "çoğunluk bildirimi" `research_note` olarak da gösterilsin mi, yoksa yukarıdaki "Kullanılmayacak kaynaklar" listesi nedeniyle hiç gösterilmesin mi? Karar gelene kadar gösterilmez.
-- TODO(KDU): "Otomatik eşleşen ve tutarlı kayıtlar kontrol listesine düşmez" ilkesi (UX 5) ile "tedarikçi SDS'i uzman onayından sonra kullanılır" kuralı (Veri kaynakları, madde 2) arasındaki ilişki: mevcut onaylı profille tutarlı bir tedarikçi SDS'i onay beklemeden mi kullanılır, yoksa tek tıkla onay (kontrol listesi dışında, hammadde ekranında) mı alınır? Karar gelene kadar onay istenir.
+- Karar (2026-10-19, erdem): ECHA C&L "çoğunluk bildirimi" hiçbir biçimde gösterilmez; `research_note` olarak da girmez.
+- Karar (2026-10-19, erdem): Mevcut onaylı profille tutarlı tedarikçi SDS'i için hammadde ekranında tek tıkla onay istenir (kontrol listesine düşmez, onaysız da kullanılmaz).
+- Karar (2026-10-19, erdem): Aynı CAS için `harmonised` dışındaki profiller çelişirse sistem seçim yapmaz; çelişki KDU kontrol listesine düşer.
 - TODO: Kullanım koşullarına müşteri onayı maddesi (ortak havuz).
 - TODO: Ayrı geliştirme ortamı (lisansı belirsiz kaynaklar için).
 

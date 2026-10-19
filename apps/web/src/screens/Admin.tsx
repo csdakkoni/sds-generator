@@ -58,7 +58,11 @@ export function Admin() {
       const { data, error: callError } = await supabase.functions.invoke('import-ek6', {
         body: { entries: chunk, dryRun: dryRunMode },
       });
-      if (callError) throw new Error(callError.message);
+      if (callError) {
+        // The SDK hides the function's body behind a generic message; read it for the reason.
+        const detail = await callError.context?.json().catch(() => null);
+        throw new Error(detail?.error ?? callError.message);
+      }
       const result = data as Totals & { error?: string };
       if (result.error) throw new Error(result.error);
       totals.created += result.created;

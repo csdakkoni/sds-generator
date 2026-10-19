@@ -3,7 +3,7 @@
 usage: python3 build_public_json.py <parsed.json> <current-public.json> <out.json>
 
 Keeps names from the current file, takes numbers and classification fields from the
-parse, strips control characters (Postgres rejects them) and nulls a CAS number that an
+parse, keeps the raw note and special-limit/M-factor text, strips control characters (Postgres rejects them) and nulls a CAS number that an
 earlier entry already uses (substances.cas_number is unique; the entry stays keyed by list_no).
 """
 import json
@@ -32,6 +32,8 @@ for c in cur['entries']:
         'label_pictograms': n.get('label_pictograms') or [],
         'signal_word': n.get('signal_word'),
         'label_h': n.get('label_h') or [], 'euh': n.get('euh') or [],
+        'note': squash(n.get('note')) or None,
+        'scl_m_text': squash(n.get('scl_m_text')) or None,
     })
 text = json.dumps({'source': cur['source'], 'count': len(entries), 'entries': entries}, ensure_ascii=False)
 assert not re.search(r'[\x00-\x1f]', text), 'control character left in output'

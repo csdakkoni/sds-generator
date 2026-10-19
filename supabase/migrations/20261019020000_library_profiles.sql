@@ -2,7 +2,6 @@
 -- Additive only: nothing is dropped or rewritten. A substance keeps one identity row; its
 -- classifications now hang off one or more PROFILES (1:N), each with a source, a licence, a
 -- verification state and the conditions under which it applies.
--- DRAFT: not applied to the database until the owner has seen it.
 
 -- ---------------------------------------------------------------------------
 -- Enums

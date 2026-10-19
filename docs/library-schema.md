@@ -1,6 +1,6 @@
 # Madde kütüphanesi şeması (Adım 1 taslağı)
 
-Durum: **taslak, veritabanına uygulanmadı.** Onay sonrası uygulanacak.
+Durum: **onayınla veritabanına uygulandı (2026-10-19, migration `library_profiles`).**
 Dosyalar: `supabase/migrations/20261019020000_library_profiles.sql`, `packages/library-schema/`, testler `supabase/tests/library.test.sql`.
 
 ## Ne değişiyor

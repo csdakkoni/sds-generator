@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { SubstanceLibrary } from './SubstanceLibrary';
 
 interface Ek6File {
   count: number;
@@ -155,6 +156,8 @@ export function Admin() {
           Yazıldı: {written.created} yeni, {written.updated} güncellenen kayıt.
         </p>
       )}
+
+      <SubstanceLibrary />
     </div>
   );
 }

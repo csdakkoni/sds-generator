@@ -96,7 +96,12 @@ export function SdsPanel({
   userId: string;
   productId: string;
   product: { name: string; code: string | null };
-  mixture: { input: MixtureInput; notes: EngineWarning[]; cas: Record<string, string | null> };
+  mixture: {
+    input: MixtureInput;
+    notes: EngineWarning[];
+    cas: Record<string, string | null>;
+    ec: Record<string, string | null>;
+  };
   result: ClassificationResult;
   measurements: SdsContent['measurements'];
   dataSources: DataSource[];

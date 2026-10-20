@@ -4,10 +4,14 @@
  * POST { entries, dryRun } with a platform admin's session. The function checks the caller
  * with is_platform_admin(), then writes as the caller, so RLS on substances stays the
  * authority. The client sends the parsed Ek-6 entries in chunks of at most 500. A dry run
- * only counts what would be created or updated. Hazard classifications are not written
- * here: they need expert review first.
+ * only counts what would be created or updated.
+ *
+ * mode "substances" (default) writes identities. mode "profiles" writes one pending harmonised
+ * profile per substance with the raw Annex 6 row in source_snapshot (and the regulation version
+ * record they point to). Hazard class lines are not written: they need expert review first.
  */
 import { createClient } from '@supabase/supabase-js';
+import { buildProfile, EK6_REGULATION, EK6_VERSION, type Ek6Row } from '../_shared/ek6/profile.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +22,7 @@ const CORS = {
 const MAX_CHUNK = 500;
 const LIST_NO = /^\d{3}-\d{3}-\d{2}-[\dX]$/;
 
-interface Ek6Entry {
+interface Ek6Entry extends Ek6Row {
   list_no: string;
   name_en: string;
   name_tr: string;
@@ -67,6 +71,7 @@ Deno.serve(async (req) => {
   const body = (await req.json().catch(() => null)) as {
     entries?: unknown;
     dryRun?: unknown;
+    mode?: unknown;
   } | null;
   if (!body || !Array.isArray(body.entries)) return json({ error: 'entries is required' }, 400);
   if (body.entries.length > MAX_CHUNK)
@@ -82,6 +87,8 @@ Deno.serve(async (req) => {
   const { data: isAdmin, error: adminError } = await supabase.rpc('is_platform_admin');
   if (adminError) return json({ error: adminError.message }, 500);
   if (!isAdmin) return json({ error: 'platform admin only' }, 403);
+
+  if (body.mode === 'profiles') return importProfiles(supabase, entries, dryRun);
 
   const { data: existing, error: readError } = await supabase
     .from('substances')
@@ -110,3 +117,86 @@ Deno.serve(async (req) => {
   if (writeError) return json({ error: writeError.message }, 400);
   return json({ dryRun: false, created, updated });
 });
+
+type Client = ReturnType<typeof createClient>;
+
+/** Finds (or, outside a dry run, creates) the draft regulation version the profiles point to. */
+async function ensureVersion(supabase: Client, dryRun: boolean): Promise<string | null> {
+  const { data: found, error } = await supabase
+    .from('regulation_versions')
+    .select('id')
+    .eq('regulation', EK6_REGULATION)
+    .eq('gazette_number', EK6_VERSION.gazette_number)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (found) return found.id as string;
+  if (dryRun) return null;
+  const { data: created, error: insertError } = await supabase
+    .from('regulation_versions')
+    .insert(EK6_VERSION)
+    .select('id')
+    .single();
+  if (insertError) throw new Error(insertError.message);
+  return created.id as string;
+}
+
+async function importProfiles(supabase: Client, entries: Ek6Entry[], dryRun: boolean) {
+  try {
+    const versionId = await ensureVersion(supabase, dryRun);
+    const { data: substances, error: substanceError } = await supabase
+      .from('substances')
+      .select('id, list_no')
+      .in(
+        'list_no',
+        entries.map((e) => e.list_no),
+      );
+    if (substanceError) throw new Error(substanceError.message);
+    const idByListNo = new Map(
+      (substances ?? []).map((r) => [r.list_no as string, r.id as string]),
+    );
+    const missing = entries.filter((e) => !idByListNo.has(e.list_no)).map((e) => e.list_no);
+
+    const { data: existing, error: profileError } = await supabase
+      .from('classification_profiles')
+      .select('id, substance_id, verification_status')
+      .eq('source_type', 'harmonised')
+      .is('effective_to', null)
+      .in('substance_id', [...idByListNo.values()]);
+    if (profileError) throw new Error(profileError.message);
+    const profileBySubstance = new Map((existing ?? []).map((p) => [p.substance_id as string, p]));
+
+    let created = 0;
+    let updated = 0;
+    let kept = 0;
+    const inserts: ReturnType<typeof buildProfile>[] = [];
+    for (const entry of entries) {
+      const substanceId = idByListNo.get(entry.list_no);
+      if (!substanceId) continue;
+      const current = profileBySubstance.get(substanceId);
+      if (!current) {
+        created += 1;
+        if (!dryRun) inserts.push(buildProfile(entry, substanceId, versionId ?? ''));
+      } else if (current.verification_status === 'pending') {
+        updated += 1;
+        if (!dryRun) {
+          const { source_snapshot } = buildProfile(entry, substanceId, versionId ?? '');
+          const { error } = await supabase
+            .from('classification_profiles')
+            .update({ source_snapshot })
+            .eq('id', current.id);
+          if (error) throw new Error(error.message);
+        }
+      } else {
+        // A profile a person already verified is never overwritten by an import.
+        kept += 1;
+      }
+    }
+    if (inserts.length > 0) {
+      const { error } = await supabase.from('classification_profiles').insert(inserts);
+      if (error) throw new Error(error.message);
+    }
+    return json({ dryRun, mode: 'profiles', created, updated, kept, missingSubstances: missing });
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : String(e) }, 400);
+  }
+}

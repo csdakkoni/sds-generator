@@ -45,6 +45,30 @@ select tests.expect_rows_changed('owner with KDU role approves',
     where id = (select id from tests.ids where key = 'rev_a2')$$, 1);
 select tests.logout();
 
+-- Approved SDS PDFs: written once by the firm's KDU.
+select tests.login('aaaaaaaa-0000-0000-0000-000000000001');
+select tests.expect_rows_changed('KDU stores the approved PDF',
+  $$insert into storage.objects (bucket_id, name)
+    select 'sds-pdf', id || '/rev2.pdf' from tests.ids where key = 'org_a'$$, 1);
+select tests.expect_rows_changed('the PDF path is recorded on the approved revision',
+  $$update public.sds_revisions
+      set pdf_path = (select id from tests.ids where key = 'org_a') || '/rev2.pdf'
+    where id = (select id from tests.ids where key = 'rev_a2')$$, 1);
+select tests.expect_error('a recorded PDF cannot be replaced',
+  $$update public.sds_revisions set pdf_path = 'other.pdf'
+    where id = (select id from tests.ids where key = 'rev_a2')$$,
+  'cannot be replaced');
+select tests.expect_rows_changed('a stored PDF cannot be overwritten',
+  $$update storage.objects set name = name where bucket_id = 'sds-pdf'$$, 0);
+select tests.logout();
+
+select tests.login('aaaaaaaa-0000-0000-0000-00000000000e');
+select tests.expect_error('viewer cannot store an approved PDF',
+  $$insert into storage.objects (bucket_id, name)
+    select 'sds-pdf', id || '/rev9.pdf' from tests.ids where key = 'org_a'$$,
+  'row-level security');
+select tests.logout();
+
 select tests.login('bbbbbbbb-0000-0000-0000-000000000001');
 select tests.expect_rows_changed('B cannot give itself a role in firm A',
   $$update public.organization_members set extra_roles = '{kdu}'

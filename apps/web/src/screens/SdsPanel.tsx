@@ -29,6 +29,7 @@ interface RevisionRow {
   change_log: number[];
   approved_by: string | null;
   approved_at: string | null;
+  pdf_path: string | null;
   created_at: string;
 }
 
@@ -131,7 +132,7 @@ export function SdsPanel({
       supabase
         .from('sds_documents')
         .select(
-          'id, language, document_number, status, sds_revisions (id, sds_document_id, revision_number, content, change_log, approved_by, approved_at, created_at)',
+          'id, language, document_number, status, sds_revisions (id, sds_document_id, revision_number, content, change_log, approved_by, approved_at, pdf_path, created_at)',
         )
         .eq('product_id', productId),
     ]).then(([o, d]) => {
@@ -238,7 +239,7 @@ export function SdsPanel({
     const { data, error: loadError } = await supabase
       .from('sds_documents')
       .select(
-        'id, language, document_number, status, sds_revisions (id, sds_document_id, revision_number, content, change_log, approved_by, approved_at, created_at)',
+        'id, language, document_number, status, sds_revisions (id, sds_document_id, revision_number, content, change_log, approved_by, approved_at, pdf_path, created_at)',
       )
       .eq('product_id', productId);
     if (loadError) throw new Error(loadError.message);
@@ -325,9 +326,21 @@ export function SdsPanel({
           .eq('id', d.id);
         if (publishError) throw new Error(`Yayınlanamadı: ${publishError.message}`);
       }
+      let stored = true;
+      for (const d of docs) {
+        const revision = d.sds_revisions.find((r) => r.revision_number === latest.revision_number);
+        if (!revision) continue;
+        try {
+          await storeApprovedPdf(d, revision, { by: userId, at });
+        } catch {
+          stored = false;
+        }
+      }
       setMessage({
-        tone: 'ok',
-        text: `Revizyon ${latest.revision_number} onaylandı ve yayınlandı.`,
+        tone: stored ? 'ok' : 'error',
+        text: stored
+          ? `Revizyon ${latest.revision_number} onaylandı, yayınlandı ve PDF'leri saklandı.`
+          : `Revizyon ${latest.revision_number} onaylandı ve yayınlandı, ancak PDF saklanamadı. Revizyonlar listesinden "PDF'i sakla"ya bas.`,
       });
     } catch (e) {
       setMessage({ tone: 'error', text: e instanceof Error ? e.message : String(e) });
@@ -337,50 +350,123 @@ export function SdsPanel({
     }
   }
 
-  async function downloadPdf(l: SdsLanguage, revision: RevisionRow | null) {
+  /** Renders one language of a revision (or of the current draft) to a PDF file. */
+  async function renderPdf(
+    l: SdsLanguage,
+    revision: RevisionRow | null,
+    docNumber: string,
+    approver?: { by: string; at: string },
+  ): Promise<{ blob: Blob; revisionNumber: number }> {
     const source = revision?.content ?? content;
-    if (!source) return;
+    if (!source) throw new Error('İçerik yok.');
+    const [{ pdf }, { SdsPdf, registerFonts }] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('../lib/sds/SdsPdf'),
+    ]);
+    const base = new URL(import.meta.env.BASE_URL, window.location.origin).href;
+    registerFonts(base);
+    const approvedBy = approver?.by ?? revision?.approved_by ?? null;
+    const info: RevisionInfo = {
+      documentNumber: docNumber,
+      revisionNumber:
+        revision?.revision_number ??
+        (latest && !latest.approved_by
+          ? latest.revision_number
+          : (latest?.revision_number ?? 0) + 1),
+      date: trDate(approver?.at ?? revision?.approved_at ?? revision?.created_at ?? today()),
+      approvedBy,
+      changedSections:
+        revision?.change_log ?? (latest ? changedSections(latest.content, source) : []),
+    };
+    const sections = buildSections(source, l, info, (key) => source.inputs.texts[l][key] ?? '');
+    const blob = await pdf(
+      <SdsPdf
+        meta={{
+          lang: l,
+          productName: source.product.name,
+          documentNumber: docNumber,
+          revisionNumber: info.revisionNumber,
+          date: info.date,
+          draft: !approvedBy,
+          assetBase: base,
+        }}
+        sections={sections}
+      />,
+    ).toBlob();
+    return { blob, revisionNumber: info.revisionNumber };
+  }
+
+  function saveBlob(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  /** Stores the approved PDF once; the database refuses to replace it later. */
+  async function storeApprovedPdf(
+    d: DocumentRow,
+    revision: RevisionRow,
+    approver?: { by: string; at: string },
+  ) {
+    const { blob } = await renderPdf(d.language, revision, d.document_number, approver);
+    const path = `${org}/${d.id}/rev${revision.revision_number}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('sds-pdf')
+      .upload(path, blob, { contentType: 'application/pdf', upsert: false });
+    if (uploadError) throw new Error(uploadError.message);
+    const { error: pathError } = await supabase
+      .from('sds_revisions')
+      .update({ pdf_path: path })
+      .eq('id', revision.id);
+    if (pathError) throw new Error(pathError.message);
+  }
+
+  async function retryStore(revisionNumber: number) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      for (const d of docs ?? []) {
+        const revision = d.sds_revisions.find((r) => r.revision_number === revisionNumber);
+        if (revision?.approved_by && !revision.pdf_path) await storeApprovedPdf(d, revision);
+      }
+      setMessage({ tone: 'ok', text: 'Onaylı PDF saklandı.' });
+    } catch (e) {
+      setMessage({
+        tone: 'error',
+        text: `PDF saklanamadı: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    } finally {
+      setBusy(false);
+      reload();
+    }
+  }
+
+  async function downloadPdf(l: SdsLanguage, revision: RevisionRow | null) {
     setBusy(true);
     try {
-      const [{ pdf }, { SdsPdf, registerFonts }] = await Promise.all([
-        import('@react-pdf/renderer'),
-        import('../lib/sds/SdsPdf'),
-      ]);
-      const base = new URL(import.meta.env.BASE_URL, window.location.origin).href;
-      registerFonts(base);
-      const info: RevisionInfo = {
-        documentNumber,
-        revisionNumber:
-          revision?.revision_number ??
-          (latest && !latest.approved_by
-            ? latest.revision_number
-            : (latest?.revision_number ?? 0) + 1),
-        date: trDate(revision?.approved_at ?? revision?.created_at ?? today()),
-        approvedBy: revision?.approved_by ?? null,
-        changedSections:
-          revision?.change_log ?? (latest ? changedSections(latest.content, source) : []),
-      };
-      const sections = buildSections(source, l, info, (key) => source.inputs.texts[l][key] ?? '');
-      const blob = await pdf(
-        <SdsPdf
-          meta={{
-            lang: l,
-            productName: source.product.name,
-            documentNumber,
-            revisionNumber: info.revisionNumber,
-            date: info.date,
-            draft: !revision?.approved_by,
-            assetBase: base,
-          }}
-          sections={sections}
-        />,
-      ).toBlob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${documentNumber}-${l.toUpperCase()}-rev${info.revisionNumber}${revision?.approved_by ? '' : '-taslak'}.pdf`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      const doc = docs?.find((d) => d.language === l);
+      // An approved revision downloads the stored file, so what was approved is what is served.
+      if (revision?.pdf_path) {
+        const { data, error } = await supabase.storage.from('sds-pdf').download(revision.pdf_path);
+        if (error) throw new Error(error.message);
+        saveBlob(
+          data,
+          `${doc?.document_number ?? documentNumber}-${l.toUpperCase()}-rev${revision.revision_number}.pdf`,
+        );
+        return;
+      }
+      const { blob, revisionNumber } = await renderPdf(
+        l,
+        revision,
+        doc?.document_number ?? documentNumber,
+      );
+      saveBlob(
+        blob,
+        `${documentNumber}-${l.toUpperCase()}-rev${revisionNumber}${revision?.approved_by ? '' : '-taslak'}.pdf`,
+      );
     } catch (e) {
       setMessage({
         tone: 'error',
@@ -709,6 +795,15 @@ export function SdsPanel({
                     : `taslak · ${trDate(r.created_at)}`}
                   {r.change_log.length > 0 && ` · değişen bölümler: ${r.change_log.join(', ')}`}
                 </span>
+                {r.approved_by && !r.pdf_path && isKdu && trDoc && (
+                  <button
+                    type="button"
+                    className="text-amber-800 underline"
+                    onClick={() => void retryStore(r.revision_number)}
+                  >
+                    PDF'i sakla
+                  </button>
+                )}
                 {r.approved_by && (
                   <span className="ml-auto flex gap-2">
                     <button

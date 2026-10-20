@@ -5,6 +5,7 @@
  * against the CLP/SEA table it implements.
  */
 export { hCodeOptions, isHazardCategory } from './categories';
+export { applyHarmonised } from './harmonised';
 export { classifyMixture } from './classify';
 export { ENGINE_VERSION } from './version';
 export * from './types';

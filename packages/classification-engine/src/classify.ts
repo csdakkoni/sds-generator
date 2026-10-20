@@ -1,4 +1,5 @@
 import { isHazardCategory } from './categories';
+import { applyHarmonised } from './harmonised';
 import { deriveLabel } from './label';
 import { classifyAcuteToxicity } from './rules/acute-toxicity';
 import { classifyAquatic, classifyAspiration } from './rules/aspiration-aquatic';
@@ -104,7 +105,10 @@ export function classifyMixture(input: MixtureInput): ClassificationResult {
 
 function validate(input: MixtureInput, warnings: EngineWarning[]): Component[] {
   const components: Component[] = [];
-  for (const raw of input.components) {
+  for (const original of input.components) {
+    const merged = applyHarmonised(original);
+    const raw = merged.component;
+    warnings.push(...merged.warnings);
     const { min, max } = raw.concentration;
     if (!(Number.isFinite(min) && Number.isFinite(max) && min >= 0 && min <= max && max <= 100)) {
       warnings.push({

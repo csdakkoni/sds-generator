@@ -9,6 +9,7 @@ import {
   type RecipeLine,
   type RecipeMaterial,
 } from '../lib/mixture';
+import { loadHarmonised, type HarmonisedEntry } from '../lib/ek6';
 import { canEdit } from '../lib/review';
 import { supabase } from '../lib/supabase';
 import type { DataSource } from '../lib/sds/content';
@@ -121,12 +122,37 @@ export function Product({
     };
   }, [productId, org, version]);
 
+  // Verified Annex 6 entries for the CAS numbers of the approved supplier SDS components.
+  const [harmonised, setHarmonised] = useState<Record<string, HarmonisedEntry>>({});
+  useEffect(() => {
+    if (!data) return;
+    const used = new Set(data.lines.map((l) => l.raw_material_id));
+    const cas = data.materials
+      .filter((m) => used.has(m.id))
+      .flatMap((m) => approvedDocument(m)?.extraction?.components ?? [])
+      .map((c) => c.cas.value)
+      .filter((v): v is string => !!v);
+    let active = true;
+    void loadHarmonised(cas)
+      .then((found) => {
+        if (active) setHarmonised(found);
+      })
+      .catch((e: unknown) => {
+        if (active)
+          setError(`Ek-6 verisi okunamadı: ${e instanceof Error ? e.message : String(e)}`);
+      });
+    return () => {
+      active = false;
+    };
+  }, [data]);
+
   const computed = useMemo(() => {
     if (!data || data.lines.length === 0) return null;
     const mixture = buildMixture(
       data.lines,
       data.materials.map(toRecipeMaterial),
       data.measurements,
+      harmonised,
     );
     // The supplier SDS revisions the result rests on, for section 16 and the revision record.
     const used = new Set(data.lines.map((l) => l.raw_material_id));
@@ -157,7 +183,7 @@ export function Product({
       dataSources,
       measurements,
     };
-  }, [data]);
+  }, [data, harmonised]);
 
   async function addLines(lines: { rawMaterialId: string; min: number; max: number }[]) {
     if (!data || lines.length === 0) return;
@@ -265,6 +291,11 @@ export function Product({
                           </a>
                           {!m?.approvedExtraction && (
                             <small className="block text-amber-700">SDS'i onaylı değil</small>
+                          )}
+                          {computed?.mixture.sources[l.id] && (
+                            <small className="block text-slate-500">
+                              Kaynak: {computed.mixture.sources[l.id]}
+                            </small>
                           )}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono whitespace-nowrap">

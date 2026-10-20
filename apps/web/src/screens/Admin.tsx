@@ -18,9 +18,22 @@ interface Totals {
   created: number;
   updated: number;
   kept?: number;
+  /** Hazard class lines mode only. */
+  rows?: number;
+  lines?: number;
+  alreadyHave?: number;
+  withSclOrNote?: number;
+  unparsed?: { list_no: string; reason: string }[];
+  unparsedCount?: number;
 }
 
-type Mode = 'substances' | 'profiles';
+type Mode = 'substances' | 'profiles' | 'lines';
+
+const MODE_LABEL: Record<Mode, string> = {
+  substances: 'maddeler',
+  profiles: 'sınıflandırma profilleri',
+  lines: 'sınıf satırları',
+};
 
 const CHUNK = 500;
 
@@ -71,9 +84,17 @@ export function Admin() {
       }
       const result = data as Totals & { error?: string };
       if (result.error) throw new Error(result.error);
-      totals.created += result.created;
-      totals.updated += result.updated;
+      totals.created += result.created ?? 0;
+      totals.updated += result.updated ?? 0;
       totals.kept = (totals.kept ?? 0) + (result.kept ?? 0);
+      if (mode === 'lines') {
+        totals.rows = (totals.rows ?? 0) + (result.rows ?? 0);
+        totals.lines = (totals.lines ?? 0) + (result.lines ?? 0);
+        totals.alreadyHave = (totals.alreadyHave ?? 0) + (result.alreadyHave ?? 0);
+        totals.withSclOrNote = (totals.withSclOrNote ?? 0) + (result.withSclOrNote ?? 0);
+        totals.unparsedCount = (totals.unparsedCount ?? 0) + (result.unparsedCount ?? 0);
+        totals.unparsed = [...(totals.unparsed ?? []), ...(result.unparsed ?? [])];
+      }
     }
     return totals;
   }
@@ -148,6 +169,14 @@ export function Admin() {
         >
           Kuru çalıştır: sınıflandırma profilleri
         </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void runDryRun('lines')}
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:border-sky-300 disabled:opacity-50"
+        >
+          Kuru çalıştır: sınıf satırları
+        </button>
         {dryRun && (
           <button
             type="button"
@@ -161,24 +190,59 @@ export function Admin() {
         {busy && <span className="text-sm text-slate-500">Çalışıyor… {progress}</span>}
       </div>
 
-      {dryRun && (
+      {dryRun && mode !== 'lines' && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Kuru çalıştırma ({mode === 'profiles' ? 'sınıflandırma profilleri' : 'maddeler'}):{' '}
-          {dryRun.created} yeni kayıt eklenecek, {dryRun.updated} mevcut kayıt güncellenecek
+          Kuru çalıştırma ({MODE_LABEL[mode]}): {dryRun.created} yeni kayıt eklenecek,{' '}
+          {dryRun.updated} mevcut kayıt güncellenecek
           {dryRun.kept ? `, ${dryRun.kept} onaylı profil olduğu gibi korunacak` : ''}. Yazmak için
           "Onayla ve yaz"a bas.
         </p>
       )}
-      {written && (
+      {written && mode !== 'lines' && (
         <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Yazıldı: {written.created} yeni, {written.updated} güncellenen
           {written.kept ? `, ${written.kept} korunan` : ''} kayıt.
         </p>
       )}
+      {mode === 'lines' && (dryRun ?? written) && (
+        <LinesReport totals={(dryRun ?? written) as Totals} done={written !== null} />
+      )}
 
       <RegulationWatch />
 
       <SubstanceLibrary />
+    </div>
+  );
+}
+
+/** Result of the "sınıf satırları" step: what was split, what did not reconcile and why. */
+function LinesReport({ totals, done }: { totals: Totals; done: boolean }) {
+  const unparsed = totals.unparsed ?? [];
+  return (
+    <div className="grid gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <p>
+        {done ? 'Yazıldı' : 'Kuru çalıştırma'}: {totals.rows ?? 0} maddenin sınıflandırması{' '}
+        {totals.lines ?? 0} satıra ayrıldı
+        {totals.alreadyHave ? `, ${totals.alreadyHave} maddede satırlar zaten vardı` : ''}.{' '}
+        {totals.unparsedCount ?? 0} madde çözülemedi; bunlar için hiçbir şey yazılmaz, KDU'ya
+        bırakılır.
+        {totals.withSclOrNote
+          ? ` ${totals.withSclOrNote} maddede özel konsantrasyon sınırı veya dipnot var; bunlar satırlara henüz işlenmedi (KDU kontrolü gerekir).`
+          : ''}
+        {!done && ' Yazmak için "Onayla ve yaz"a bas.'}
+      </p>
+      {unparsed.length > 0 && (
+        <details>
+          <summary className="cursor-pointer">Çözülemeyen maddeler (ilk {unparsed.length})</summary>
+          <ul className="mt-1 list-disc pl-5">
+            {unparsed.map((u) => (
+              <li key={u.list_no}>
+                {u.list_no}: {u.reason}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

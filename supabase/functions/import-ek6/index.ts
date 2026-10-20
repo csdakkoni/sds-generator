@@ -8,9 +8,12 @@
  *
  * mode "substances" (default) writes identities. mode "profiles" writes one pending harmonised
  * profile per substance with the raw Annex 6 row in source_snapshot (and the regulation version
- * record they point to). Hazard class lines are not written: they need expert review first.
+ * record they point to). mode "lines" then splits each row's classification into hazard class
+ * lines on its pending profile (rows that do not reconcile are reported, never guessed). The
+ * profile itself stays pending until a KDU verifies it.
  */
 import { createClient } from '@supabase/supabase-js';
+import { parseClassification } from '../_shared/ek6/lines.ts';
 import { buildProfile, EK6_REGULATION, EK6_VERSION, type Ek6Row } from '../_shared/ek6/profile.ts';
 
 const CORS = {
@@ -89,6 +92,7 @@ Deno.serve(async (req) => {
   if (!isAdmin) return json({ error: 'platform admin only' }, 403);
 
   if (body.mode === 'profiles') return importProfiles(supabase, entries, dryRun);
+  if (body.mode === 'lines') return importLines(supabase, entries, dryRun);
 
   const { data: existing, error: readError } = await supabase
     .from('substances')
@@ -207,6 +211,104 @@ async function importProfiles(supabase: Client, entries: Ek6Entry[], dryRun: boo
       if (error) throw new Error(error.message);
     }
     return json({ dryRun, mode: 'profiles', created, updated, kept, missingSubstances: missing });
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : String(e) }, 400);
+  }
+}
+
+const MAX_REPORTED = 100;
+
+async function importLines(supabase: Client, entries: Ek6Entry[], dryRun: boolean) {
+  try {
+    const idByListNo = new Map<string, string>();
+    for (const part of chunks(entries.map((e) => e.list_no))) {
+      const { data, error } = await supabase
+        .from('substances')
+        .select('id, list_no')
+        .in('list_no', part);
+      if (error) throw new Error(error.message);
+      for (const r of data ?? []) idByListNo.set(r.list_no as string, r.id as string);
+    }
+    const profileBySubstance = new Map<string, { id: string; verification_status: string }>();
+    for (const part of chunks([...idByListNo.values()])) {
+      const { data, error } = await supabase
+        .from('classification_profiles')
+        .select('id, substance_id, verification_status')
+        .eq('source_type', 'harmonised')
+        .is('effective_to', null)
+        .in('substance_id', part);
+      if (error) throw new Error(error.message);
+      for (const p of data ?? []) {
+        profileBySubstance.set(p.substance_id as string, {
+          id: p.id as string,
+          verification_status: p.verification_status as string,
+        });
+      }
+    }
+    const withLines = new Set<string>();
+    for (const part of chunks([...profileBySubstance.values()].map((p) => p.id))) {
+      const { data, error } = await supabase
+        .from('substance_classifications')
+        .select('profile_id')
+        .in('profile_id', part);
+      if (error) throw new Error(error.message);
+      for (const r of data ?? []) withLines.add(r.profile_id as string);
+    }
+
+    let written = 0;
+    let alreadyHave = 0;
+    let withoutProfile = 0;
+    let sclOrNote = 0;
+    const unparsed: { list_no: string; reason: string }[] = [];
+    const inserts: Record<string, unknown>[] = [];
+    for (const entry of entries) {
+      const substanceId = idByListNo.get(entry.list_no);
+      const profile = substanceId ? profileBySubstance.get(substanceId) : undefined;
+      if (!substanceId || !profile || profile.verification_status !== 'pending') {
+        withoutProfile += 1;
+        continue;
+      }
+      if (withLines.has(profile.id)) {
+        alreadyHave += 1;
+        continue;
+      }
+      const parsed = parseClassification(entry);
+      if (!parsed.ok) {
+        unparsed.push({ list_no: entry.list_no, reason: parsed.reason });
+        continue;
+      }
+      written += 1;
+      if (entry.scl_m_text || entry.note) sclOrNote += 1;
+      for (const line of parsed.lines) {
+        inserts.push({
+          substance_id: substanceId,
+          profile_id: profile.id,
+          organization_id: null,
+          hazard_class: line.hazard_class,
+          category: line.category,
+          h_code: line.h_code,
+          source_type: 'sea_annex6',
+          source_reference: `Ek-6 liste no ${entry.list_no}`,
+        });
+      }
+    }
+    if (!dryRun) {
+      for (const part of chunks(inserts, 200)) {
+        const { error } = await supabase.from('substance_classifications').insert(part);
+        if (error) throw new Error(error.message);
+      }
+    }
+    return json({
+      dryRun,
+      mode: 'lines',
+      rows: written,
+      lines: inserts.length,
+      alreadyHave,
+      withoutPendingProfile: withoutProfile,
+      withSclOrNote: sclOrNote,
+      unparsedCount: unparsed.length,
+      unparsed: unparsed.slice(0, MAX_REPORTED),
+    });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 400);
   }

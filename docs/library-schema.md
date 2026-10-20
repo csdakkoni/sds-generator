@@ -81,3 +81,11 @@ Dosyadaki durum (4.258 kayıt): sınıflandırma metni 4.258, H kodu listesi 4.2
 - Onaylanmış (`verified`) bir profil içe aktarmada ezilmez.
 - TODO(KDU): Yürürlük tarihi ve geçiş süresi dosyada yok; `effective_from` boş bırakıldı. Teyit edilince kayıt güncellenecek.
 - TODO(KDU): Sınıflandırma metnindeki Türkçe kısaltmaların (ör. "Su-tepk. 1", "Cilt Aşnd. 1A") sınıf ve kategoriye eşlenmesi ayrı adımdır ve KDU onayı ister.
+
+## Ek-6 sınıf satırları
+
+`import-ek6` fonksiyonunun `lines` modu, her Ek-6 satırının sınıflandırma hücresini ("Göz Hsr. 1 Cilt Hassas. 1") sınıf satırlarına ayırır (`supabase/functions/_shared/ek6/lines.ts`, KDU onaylı kısaltma eşlemesi).
+H kodu metinden taranmaz; satırın yapılandırılmış H listesinden gelir ve yalnızca sınıfa uyuyorsa alınır. Sınıflar ile H listesi tam örtüşmezse satır yazılmaz, rapora düşer.
+Satırlar profile bağlıdır; profil KDU doğrulayana kadar `pending` kalır ve hesaplamaya girmez.
+
+TODO(KDU): özel konsantrasyon sınırı / M-faktörü metni (`scl_m_text`) ve dipnot harfleri satırlara henüz işlenmedi; patlayıcı bölümleri ("Pat. 1.1", "Kar.Pat.") eşlemede yok, çözülemeyenler arasında; "Basınç Gaz" için H kodu tabloda yok (satır H kodsuz yazılır).

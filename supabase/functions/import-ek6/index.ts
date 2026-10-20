@@ -120,6 +120,13 @@ Deno.serve(async (req) => {
 
 type Client = ReturnType<typeof createClient>;
 
+/** `in (...)` filters travel in the request URL, so long id lists are sent in small parts. */
+function chunks<T>(items: T[], size = 50): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 /** Finds (or, outside a dry run, creates) the draft regulation version the profiles point to. */
 async function ensureVersion(supabase: Client, dryRun: boolean): Promise<string | null> {
   const { data: found, error } = await supabase
@@ -143,27 +150,31 @@ async function ensureVersion(supabase: Client, dryRun: boolean): Promise<string 
 async function importProfiles(supabase: Client, entries: Ek6Entry[], dryRun: boolean) {
   try {
     const versionId = await ensureVersion(supabase, dryRun);
-    const { data: substances, error: substanceError } = await supabase
-      .from('substances')
-      .select('id, list_no')
-      .in(
-        'list_no',
-        entries.map((e) => e.list_no),
-      );
-    if (substanceError) throw new Error(substanceError.message);
-    const idByListNo = new Map(
-      (substances ?? []).map((r) => [r.list_no as string, r.id as string]),
-    );
+    const idByListNo = new Map<string, string>();
+    for (const part of chunks(entries.map((e) => e.list_no))) {
+      const { data, error } = await supabase
+        .from('substances')
+        .select('id, list_no')
+        .in('list_no', part);
+      if (error) throw new Error(error.message);
+      for (const r of data ?? []) idByListNo.set(r.list_no as string, r.id as string);
+    }
     const missing = entries.filter((e) => !idByListNo.has(e.list_no)).map((e) => e.list_no);
 
-    const { data: existing, error: profileError } = await supabase
-      .from('classification_profiles')
-      .select('id, substance_id, verification_status')
-      .eq('source_type', 'harmonised')
-      .is('effective_to', null)
-      .in('substance_id', [...idByListNo.values()]);
-    if (profileError) throw new Error(profileError.message);
-    const profileBySubstance = new Map((existing ?? []).map((p) => [p.substance_id as string, p]));
+    const profileBySubstance = new Map<
+      string,
+      { id: string; substance_id: string; verification_status: string }
+    >();
+    for (const part of chunks([...idByListNo.values()])) {
+      const { data, error } = await supabase
+        .from('classification_profiles')
+        .select('id, substance_id, verification_status')
+        .eq('source_type', 'harmonised')
+        .is('effective_to', null)
+        .in('substance_id', part);
+      if (error) throw new Error(error.message);
+      for (const p of data ?? []) profileBySubstance.set(p.substance_id as string, p);
+    }
 
     let created = 0;
     let updated = 0;

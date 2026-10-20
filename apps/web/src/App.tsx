@@ -6,6 +6,7 @@ import type { Membership } from './lib/types';
 import { Admin } from './screens/Admin';
 import { AuthScreen } from './screens/AuthScreen';
 import { CreateOrganization } from './screens/CreateOrganization';
+import { KduList } from './screens/KduList';
 import { Product } from './screens/Product';
 import { Products } from './screens/Products';
 import { RawMaterials } from './screens/RawMaterials';
@@ -85,7 +86,10 @@ export function App() {
       ? 'sds'
       : route.startsWith('/yonetim')
         ? 'yonetim'
-        : 'hammaddeler';
+        : route.startsWith('/kdu')
+          ? 'kdu'
+          : 'hammaddeler';
+  const showKdu = platformAdmin || hasRole(membership, 'kdu');
   const tab = (active: boolean) =>
     `rounded-md px-3 py-1.5 ${active ? 'bg-sky-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`;
   const roleLabel = hasRole(membership, 'kdu')
@@ -115,6 +119,11 @@ export function App() {
             <a href="#/sds" className={tab(section === 'sds')}>
               SDS'ler
             </a>
+            {showKdu && (
+              <a href="#/kdu" className={tab(section === 'kdu')}>
+                KDU listesi
+              </a>
+            )}
             {platformAdmin && (
               <a href="#/yonetim" className={tab(section === 'yonetim')}>
                 Yönetim
@@ -143,6 +152,8 @@ export function App() {
             productId={productId}
             onBack={() => navigate('/urunler')}
           />
+        ) : section === 'kdu' && showKdu ? (
+          <KduList userId={session.user.id} />
         ) : section === 'yonetim' && platformAdmin ? (
           <Admin />
         ) : section === 'sds' ? (

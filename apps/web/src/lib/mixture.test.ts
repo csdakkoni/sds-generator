@@ -55,6 +55,48 @@ describe('buildMixture', () => {
     expect(input.components[0]?.hazardData).toBe('classified');
   });
 
+  it('passes the verified Annex 6 entry of a CAS to the engine and labels the source', () => {
+    const { input, sources } = buildMixture(
+      [{ id: 'l1', raw_material_id: 'rm', percent_min: 100, percent_max: 100 }],
+      [
+        {
+          id: 'rm',
+          trade_name: 'Madde',
+          approvedExtraction: extraction([comp('A', 100, 100, [line('Eye Irrit. 2', 'H319')])]),
+        },
+      ],
+      [],
+      {
+        '1-1-1': {
+          reference: 'SEA Ek-6 liste no 000-000-00-0',
+          classifications: [{ category: 'Eye Dam. 1', hCode: 'H318' }],
+        },
+      },
+    );
+    expect(input.components[0]?.harmonised?.classifications).toEqual([
+      { category: 'Eye Dam. 1', hCode: 'H318' },
+    ]);
+    expect(sources.l1).toBe('SEA Ek-6 + tedarikçi SDS');
+    // The engine raises the supplier's lighter category to the official one.
+    const result = classifyMixture(input);
+    expect(result.classifications.some((c) => c.category === 'Eye Dam. 1')).toBe(true);
+  });
+
+  it('without an Annex 6 entry the source is the supplier SDS only', () => {
+    const { sources } = buildMixture(
+      [{ id: 'l1', raw_material_id: 'rm', percent_min: 100, percent_max: 100 }],
+      [
+        {
+          id: 'rm',
+          trade_name: 'Madde',
+          approvedExtraction: extraction([comp('A', 100, 100, [line('Eye Irrit. 2', 'H319')])]),
+        },
+      ],
+      [],
+    );
+    expect(sources.l1).toBe('Tedarikçi SDS (onaylı)');
+  });
+
   it('treats a raw material without an approved SDS as missing data, not as no hazard', () => {
     const { input } = buildMixture(
       [{ id: 'l1', raw_material_id: 'rm', percent_min: 100, percent_max: 100 }],

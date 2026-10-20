@@ -124,6 +124,11 @@ export interface ComponentInput {
   ate?: AcuteToxicityEstimates;
   /** Physical form relevant for inhalation toxicity; required when classified for inhalation. */
   inhalationForm?: InhalationForm;
+  /**
+   * The substance's harmonised (SEA Annex 6) classification, already verified by a person.
+   * It is a floor for the lines above: see `applyHarmonised`.
+   */
+  harmonised?: { reference: string; classifications: ComponentClassification[] };
 }
 
 /** Laboratory results measured on the mixture itself. */

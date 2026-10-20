@@ -14,6 +14,7 @@ import {
   type MixtureMeasurements,
   type SpecificConcentrationLimit,
 } from '@sds/classification-engine';
+import type { HarmonisedEntry } from './ek6';
 import type { ClassificationLine, Extraction } from './types';
 
 export interface RecipeLine {
@@ -184,11 +185,14 @@ export function buildMixture(
   lines: RecipeLine[],
   materials: RecipeMaterial[],
   measurements: MeasurementRow[],
+  harmonised: Record<string, HarmonisedEntry> = {},
 ): {
   input: MixtureInput;
   notes: EngineWarning[];
   cas: Record<string, string | null>;
   ec: Record<string, string | null>;
+  /** One-word source label per recipe line (UX principle 6). */
+  sources: Record<string, string>;
 } {
   const notes: EngineWarning[] = [];
   const components: ComponentInput[] = [];
@@ -196,6 +200,7 @@ export function buildMixture(
   const cas: Record<string, string | null> = {};
   /** EC number per engine component id, for section 3 of the SDS. */
   const ec: Record<string, string | null> = {};
+  const sources: Record<string, string> = {};
 
   for (const line of lines) {
     const material = materials.find((m) => m.id === line.raw_material_id);
@@ -205,6 +210,7 @@ export function buildMixture(
     const extraction = material?.approvedExtraction;
 
     if (!extraction) {
+      sources[line.id] = 'KDU kontrolünde';
       notes.push(
         warn(
           'info',
@@ -224,6 +230,7 @@ export function buildMixture(
 
     if (extraction.components.length === 0) {
       // No section 3: the raw material itself is the component (e.g. a single substance).
+      sources[line.id] = 'Tedarikçi SDS (onaylı)';
       const pc = extraction.productClassification;
       const classifications = mapLines(pc.lines, name, notes);
       components.push({
@@ -241,6 +248,7 @@ export function buildMixture(
       continue;
     }
 
+    let fromEk6 = 0;
     extraction.components.forEach((c, i) => {
       const label = `${c.name.value ?? `${i + 1}. bileşen`} (${name})`;
       let cMin = c.concentration?.min ?? null;
@@ -270,6 +278,8 @@ export function buildMixture(
           ),
         );
       }
+      const official = c.cas.value ? harmonised[c.cas.value] : undefined;
+      if (official) fromEk6 += 1;
       cas[`${line.id}:${i}`] = c.cas.value;
       ec[`${line.id}:${i}`] = c.ec?.value ?? null;
       components.push({
@@ -279,8 +289,15 @@ export function buildMixture(
         hazardData: c.classifications.length > 0 ? 'classified' : 'not_classified',
         classifications,
         ...componentDetails(c),
+        ...(official ? { harmonised: official } : {}),
       });
     });
+    sources[line.id] =
+      fromEk6 === 0
+        ? 'Tedarikçi SDS (onaylı)'
+        : fromEk6 === extraction.components.length
+          ? 'SEA Ek-6 + tedarikçi SDS'
+          : `SEA Ek-6 (${fromEk6}/${extraction.components.length} bileşen) + tedarikçi SDS`;
 
     const listedMax = extraction.components.reduce((s, c) => s + (c.concentration?.max ?? 100), 0);
     if (listedMax < 100 - 1e-9) {
@@ -306,7 +323,13 @@ export function buildMixture(
     );
   }
 
-  return { input: { components, measurements: toMeasurements(measurements) }, notes, cas, ec };
+  return {
+    input: { components, measurements: toMeasurements(measurements) },
+    notes,
+    cas,
+    ec,
+    sources,
+  };
 }
 
 export interface PastedLine {

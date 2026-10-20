@@ -72,3 +72,12 @@ Dosyadaki durum (4.258 kayıt): sınıflandırma metni 4.258, H kodu listesi 4.2
 - TODO(KDU): Ek-6 için Resmî Gazete tarihi/sayısı, yürürlük tarihi ve geçiş süresi teyit edilmeli (`regulation_versions` kaydı bunlarsız açılmayacak).
 - TODO(KDU): `industry_guidance`, `expert_rule`, `supplier_sds`, `shared_pool` profilleri çeliştiğinde kuyrukta çelişki kaydı açılır, motor seçmez (karar: 3. soru, hayır/evet/evet).
 - TODO(KDU): Ek-6 profillerinin `pending` → `verified` geçişi için KDU inceleme düzeni (toplu mu, madde madde mi) belirlenmeli.
+
+
+## Ek-6 profilleri nasıl yazılır (uygulandı)
+
+- `import-ek6` fonksiyonu `mode: "profiles"` ile her Ek-6 maddesi için bekleyen bir `harmonised` profil açar. Ham tablo değerleri (sınıflandırma metni, H, etiket H, EUH, piktogram, uyarı kelimesi, not, SCL/M metni) `source_snapshot` içinde saklanır. Sınıf satırları (`substance_classifications`) yazılmaz; KDU incelemesi gerekir.
+- `regulation_versions` kaydı Word dosyasının kendi başlığından alındı: "(Değişik:RG-10/12/2020-31330 Mükerrer)". Durum `draft`.
+- Onaylanmış (`verified`) bir profil içe aktarmada ezilmez.
+- TODO(KDU): Yürürlük tarihi ve geçiş süresi dosyada yok; `effective_from` boş bırakıldı. Teyit edilince kayıt güncellenecek.
+- TODO(KDU): Sınıflandırma metnindeki Türkçe kısaltmaların (ör. "Su-tepk. 1", "Cilt Aşnd. 1A") sınıf ve kategoriye eşlenmesi ayrı adımdır ve KDU onayı ister.

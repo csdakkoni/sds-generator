@@ -17,7 +17,10 @@ interface Ek6File {
 interface Totals {
   created: number;
   updated: number;
+  kept?: number;
 }
+
+type Mode = 'substances' | 'profiles';
 
 const CHUNK = 500;
 
@@ -25,6 +28,7 @@ const CHUNK = 500;
 export function Admin() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [file, setFile] = useState<Ek6File | null>(null);
+  const [mode, setMode] = useState<Mode>('substances');
   const [dryRun, setDryRun] = useState<Totals | null>(null);
   const [written, setWritten] = useState<Totals | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,14 +55,14 @@ export function Admin() {
   }
 
   /** Sends the entries in chunks; with dryRun the server only counts. */
-  async function send(dryRunMode: boolean): Promise<Totals> {
+  async function send(dryRunMode: boolean, mode: Mode): Promise<Totals> {
     const loaded = await loadFile();
     const totals: Totals = { created: 0, updated: 0 };
     for (let start = 0; start < loaded.entries.length; start += CHUNK) {
       const chunk = loaded.entries.slice(start, start + CHUNK);
       setProgress(`${Math.min(start + CHUNK, loaded.entries.length)} / ${loaded.entries.length}`);
       const { data, error: callError } = await supabase.functions.invoke('import-ek6', {
-        body: { entries: chunk, dryRun: dryRunMode },
+        body: { entries: chunk, dryRun: dryRunMode, mode },
       });
       if (callError) {
         // The SDK hides the function's body behind a generic message; read it for the reason.
@@ -69,16 +73,18 @@ export function Admin() {
       if (result.error) throw new Error(result.error);
       totals.created += result.created;
       totals.updated += result.updated;
+      totals.kept = (totals.kept ?? 0) + (result.kept ?? 0);
     }
     return totals;
   }
 
-  async function runDryRun() {
+  async function runDryRun(nextMode: Mode) {
+    setMode(nextMode);
     setBusy(true);
     setError(null);
     setWritten(null);
     try {
-      setDryRun(await send(true));
+      setDryRun(await send(true, nextMode));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -91,7 +97,7 @@ export function Admin() {
     setBusy(true);
     setError(null);
     try {
-      setWritten(await send(false));
+      setWritten(await send(false, mode));
       setDryRun(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -114,7 +120,8 @@ export function Admin() {
         <p className="mt-1 text-sm text-slate-500">
           Resmî Ek-6 tablosundaki maddeleri ortak kütüphaneye yükler. Önce kuru çalıştırma yap:
           hiçbir şey yazılmaz, yalnızca kaç kayıt ekleneceği ve kaçının güncelleneceği gösterilir.
-          Sınıflandırmalar bu adımda yazılmaz; KDU incelemesinden sonra ayrıca girilir.
+          "Sınıflandırma profilleri" her madde için bekleyen (onaylanmamış) bir Ek-6 profili açar ve
+          tablodaki ham değerleri saklar; KDU onayına kadar hesaplamada kullanılmaz.
         </p>
       </div>
 
@@ -128,10 +135,18 @@ export function Admin() {
         <button
           type="button"
           disabled={busy}
-          onClick={() => void runDryRun()}
+          onClick={() => void runDryRun('substances')}
           className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:border-sky-300 disabled:opacity-50"
         >
-          Kuru çalıştır
+          Kuru çalıştır: maddeler
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void runDryRun('profiles')}
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:border-sky-300 disabled:opacity-50"
+        >
+          Kuru çalıştır: sınıflandırma profilleri
         </button>
         {dryRun && (
           <button
@@ -148,13 +163,16 @@ export function Admin() {
 
       {dryRun && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Kuru çalıştırma: {dryRun.created} yeni kayıt eklenecek, {dryRun.updated} mevcut kayıt
-          güncellenecek. Yazmak için "Onayla ve yaz"a bas.
+          Kuru çalıştırma ({mode === 'profiles' ? 'sınıflandırma profilleri' : 'maddeler'}):{' '}
+          {dryRun.created} yeni kayıt eklenecek, {dryRun.updated} mevcut kayıt güncellenecek
+          {dryRun.kept ? `, ${dryRun.kept} onaylı profil olduğu gibi korunacak` : ''}. Yazmak için
+          "Onayla ve yaz"a bas.
         </p>
       )}
       {written && (
         <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          Yazıldı: {written.created} yeni, {written.updated} güncellenen kayıt.
+          Yazıldı: {written.created} yeni, {written.updated} güncellenen
+          {written.kept ? `, ${written.kept} korunan` : ''} kayıt.
         </p>
       )}
 

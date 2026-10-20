@@ -32,6 +32,7 @@ export function nameFromFile(fileName: string): string {
 
 export type MaterialState =
   | { kind: 'no_document' }
+  | { kind: 'by_cas' }
   | { kind: 'reading' }
   | { kind: 'failed' }
   | { kind: 'questions'; open: number }
@@ -43,7 +44,10 @@ export function materialState(m: RawMaterial): MaterialState {
   const doc = [...m.raw_material_sds_documents].sort((a, b) =>
     b.uploaded_at.localeCompare(a.uploaded_at),
   )[0];
-  if (!doc) return { kind: 'no_document' };
+  if (!doc) {
+    const manual = m.raw_material_components?.some((c) => c.sds_document_id === null);
+    return manual ? { kind: 'by_cas' } : { kind: 'no_document' };
+  }
   if (doc.status === 'approved') return { kind: 'approved' };
   if (doc.extraction_status === 'failed') return { kind: 'failed' };
   if (doc.extraction_status !== 'done') return { kind: 'reading' };

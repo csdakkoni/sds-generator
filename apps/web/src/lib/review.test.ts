@@ -56,6 +56,21 @@ describe('materialState', () => {
     });
     expect(materialState(material([{ extraction_status: 'failed' }]))).toEqual({ kind: 'failed' });
     expect(materialState(material([]))).toEqual({ kind: 'no_document' });
+    expect(
+      materialState({
+        ...material([]),
+        raw_material_components: [
+          {
+            id: 'c',
+            name_as_written: 'A',
+            cas_number: '67-64-1',
+            concentration_min: null,
+            concentration_max: null,
+            sds_document_id: null,
+          },
+        ],
+      }),
+    ).toEqual({ kind: 'by_cas' });
   });
   it('uses the most recent upload', () => {
     expect(

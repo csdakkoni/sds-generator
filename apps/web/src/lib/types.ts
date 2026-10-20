@@ -108,10 +108,21 @@ export interface SdsDocument {
   uploaded_at: string;
 }
 
+/** A component entered by hand (CAS number and range) instead of read from a supplier SDS. */
+export interface ManualComponent {
+  id: string;
+  name_as_written: string;
+  cas_number: string | null;
+  concentration_min: number | null;
+  concentration_max: number | null;
+  sds_document_id: string | null;
+}
+
 export interface RawMaterial {
   id: string;
   trade_name: string;
   supplier_name: string | null;
+  raw_material_components?: ManualComponent[];
   raw_material_sds_documents: Pick<
     SdsDocument,
     | 'id'

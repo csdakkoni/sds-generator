@@ -13,13 +13,14 @@ import { loadHarmonised, type HarmonisedEntry } from '../lib/ek6';
 import { canEdit } from '../lib/review';
 import { supabase } from '../lib/supabase';
 import type { DataSource } from '../lib/sds/content';
-import type { Extraction, Membership } from '../lib/types';
+import type { Extraction, ManualComponent, Membership } from '../lib/types';
 import { ClassificationView } from './ClassificationView';
 import { SdsPanel } from './SdsPanel';
 
 interface MaterialRow {
   id: string;
   trade_name: string;
+  raw_material_components: ManualComponent[];
   raw_material_sds_documents: {
     status: string;
     approved_at: string | null;
@@ -51,6 +52,7 @@ function toRecipeMaterial(m: MaterialRow): RecipeMaterial {
     id: m.id,
     trade_name: m.trade_name,
     approvedExtraction: approvedDocument(m)?.extraction ?? null,
+    manualComponents: m.raw_material_components.filter((c) => c.sds_document_id === null),
   };
 }
 
@@ -94,7 +96,7 @@ export function Product({
       supabase
         .from('raw_materials')
         .select(
-          'id, trade_name, raw_material_sds_documents (status, approved_at, extraction, file_name, revision_number)',
+          'id, trade_name, raw_material_components (id, name_as_written, cas_number, concentration_min, concentration_max, sds_document_id), raw_material_sds_documents (status, approved_at, extraction, file_name, revision_number)',
         )
         .eq('organization_id', org)
         .order('trade_name'),
@@ -129,8 +131,10 @@ export function Product({
     const used = new Set(data.lines.map((l) => l.raw_material_id));
     const cas = data.materials
       .filter((m) => used.has(m.id))
-      .flatMap((m) => approvedDocument(m)?.extraction?.components ?? [])
-      .map((c) => c.cas.value)
+      .flatMap((m) => [
+        ...(approvedDocument(m)?.extraction?.components ?? []).map((c) => c.cas.value),
+        ...m.raw_material_components.map((c) => c.cas_number),
+      ])
       .filter((v): v is string => !!v);
     let active = true;
     void loadHarmonised(cas)
@@ -289,7 +293,7 @@ export function Product({
                           <a href={`#/hammaddeler/${l.raw_material_id}`} className="font-semibold">
                             {m?.trade_name ?? '?'}
                           </a>
-                          {!m?.approvedExtraction && (
+                          {!m?.approvedExtraction && !m?.manualComponents?.length && (
                             <small className="block text-amber-700">SDS'i onaylı değil</small>
                           )}
                           {computed?.mixture.sources[l.id] && (

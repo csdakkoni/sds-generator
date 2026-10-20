@@ -15,7 +15,7 @@ import {
   type SpecificConcentrationLimit,
 } from '@sds/classification-engine';
 import type { HarmonisedEntry } from './ek6';
-import type { ClassificationLine, Extraction } from './types';
+import type { ClassificationLine, Extraction, ManualComponent } from './types';
 
 export interface RecipeLine {
   id: string;
@@ -29,6 +29,8 @@ export interface RecipeMaterial {
   trade_name: string;
   /** Extraction of the raw material's KDU-approved supplier SDS; null when none is approved. */
   approvedExtraction: Extraction | null;
+  /** Components entered by CAS number when there is no supplier SDS. */
+  manualComponents?: ManualComponent[];
 }
 
 export interface MeasurementRow {
@@ -176,6 +178,69 @@ function componentDetails(c: ExtractedComponent): Partial<ComponentInput> {
   return details;
 }
 
+interface Collected {
+  components: ComponentInput[];
+  notes: EngineWarning[];
+  cas: Record<string, string | null>;
+  ec: Record<string, string | null>;
+  sources: Record<string, string>;
+}
+
+/**
+ * A raw material entered by CAS number has no supplier classification. Its only hazard data
+ * is the verified Annex 6 entry; where there is none, the component stays "unknown" and the
+ * engine blocks finalising (CLAUDE.md rule 5).
+ */
+function addManual(
+  line: RecipeLine,
+  name: string,
+  manual: ManualComponent[],
+  harmonised: Record<string, HarmonisedEntry>,
+  out: Collected,
+): void {
+  const pMin = Number(line.percent_min);
+  const pMax = Number(line.percent_max);
+  let fromEk6 = 0;
+  manual.forEach((c, i) => {
+    const label = `${c.name_as_written} (${name})`;
+    let cMin = c.concentration_min;
+    let cMax = c.concentration_max;
+    if (cMin === null) cMin = 0;
+    if (cMax === null) {
+      cMax = 100;
+      out.notes.push(
+        warn(
+          'review',
+          'RECIPE_OPEN_UPPER_BOUND',
+          `${label}: hammaddedeki oranın üst sınırı girilmemiş; üst sınır %100 varsayıldı (seçilmiş varsayım).`,
+        ),
+      );
+    }
+    const official = c.cas_number ? harmonised[c.cas_number] : undefined;
+    if (official) fromEk6 += 1;
+    const id = `${line.id}:${i}`;
+    out.cas[id] = c.cas_number;
+    out.ec[id] = null;
+    out.components.push({
+      id,
+      name: label,
+      concentration: { min: (pMin * cMin) / 100, max: (pMax * cMax) / 100 },
+      hazardData: 'unknown',
+      classifications: [],
+      ...(official ? { harmonised: official } : {}),
+    });
+  });
+  out.sources[line.id] =
+    fromEk6 === 0 ? 'KDU kontrolünde' : `SEA Ek-6 (${fromEk6}/${manual.length} bileşen), SDS yok`;
+  out.notes.push(
+    warn(
+      'info',
+      'RECIPE_MATERIAL_BY_CAS',
+      `${name}: tedarikçi SDS'i yok, bileşenler CAS numarasıyla girildi. Yalnızca KDU onaylı SEA Ek-6 verisi kullanıldı.`,
+    ),
+  );
+}
+
 /**
  * Builds the engine input from recipe lines. A component's share of the mixture is its
  * range in the raw material scaled by the raw material's range in the recipe, both bounds
@@ -208,6 +273,17 @@ export function buildMixture(
     const pMax = Number(line.percent_max);
     const name = material?.trade_name ?? 'Bilinmeyen hammadde';
     const extraction = material?.approvedExtraction;
+
+    if (!extraction && material?.manualComponents?.length) {
+      addManual(line, name, material.manualComponents, harmonised, {
+        components,
+        notes,
+        cas,
+        ec,
+        sources,
+      });
+      continue;
+    }
 
     if (!extraction) {
       sources[line.id] = 'KDU kontrolünde';

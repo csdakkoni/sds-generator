@@ -82,6 +82,43 @@ describe('buildMixture', () => {
     expect(result.classifications.some((c) => c.category === 'Eye Dam. 1')).toBe(true);
   });
 
+  it('uses only the verified Annex 6 entry for a raw material entered by CAS', () => {
+    const manual = [
+      {
+        id: 'c1',
+        name_as_written: 'Madde A',
+        cas_number: '1-1-1',
+        concentration_min: 50,
+        concentration_max: 100,
+        sds_document_id: null,
+      },
+    ];
+    const recipe = [{ id: 'l1', raw_material_id: 'rm', percent_min: 10, percent_max: 20 }];
+    const material = {
+      id: 'rm',
+      trade_name: 'Karışım',
+      approvedExtraction: null,
+      manualComponents: manual,
+    };
+    const listed = buildMixture([...recipe], [material], [], {
+      '1-1-1': {
+        reference: 'SEA Ek-6 liste no 000-000-00-0',
+        classifications: [{ category: 'Eye Dam. 1', hCode: 'H318' }],
+      },
+    });
+    const c = listed.input.components[0];
+    expect(c?.concentration).toEqual({ min: 5, max: 20 });
+    expect(c?.hazardData).toBe('unknown');
+    expect(listed.cas['l1:0']).toBe('1-1-1');
+    expect(listed.sources.l1).toBe('SEA Ek-6 (1/1 bileşen), SDS yok');
+    // Supplier data is missing, so the form cannot be finalised.
+    expect(classifyMixture(listed.input).canFinalize).toBe(false);
+
+    const unlisted = buildMixture([...recipe], [material], []);
+    expect(unlisted.sources.l1).toBe('KDU kontrolünde');
+    expect(classifyMixture(unlisted.input).canFinalize).toBe(false);
+  });
+
   it('without an Annex 6 entry the source is the supplier SDS only', () => {
     const { sources } = buildMixture(
       [{ id: 'l1', raw_material_id: 'rm', percent_min: 100, percent_max: 100 }],

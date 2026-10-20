@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { canEdit, hasRole, materialState, nameFromFile, type MaterialState } from '../lib/review';
+import { isValidCas } from '../lib/cas';
 import { supabase } from '../lib/supabase';
 import type { Membership, RawMaterial } from '../lib/types';
 
 const SELECT =
-  'id, trade_name, supplier_name, raw_material_sds_documents (id, status, extraction_status, flags, uploaded_at, revision_number, revision_date)';
+  'id, trade_name, supplier_name, raw_material_components (id, name_as_written, cas_number, concentration_min, concentration_max, sds_document_id), raw_material_sds_documents (id, status, extraction_status, flags, uploaded_at, revision_number, revision_date)';
 
 function StatePill({ state }: { state: MaterialState }) {
   const map: Record<MaterialState['kind'], [string, string]> = {
     no_document: ['SDS yok', 'bg-slate-100 text-slate-600'],
+    by_cas: ['CAS ile girildi', 'bg-violet-50 text-violet-800'],
     reading: ['Okunuyor…', 'bg-sky-50 text-sky-800'],
     failed: ['Okunamadı', 'bg-red-50 text-red-700'],
     questions: ['', 'bg-amber-50 text-amber-800'],
@@ -126,6 +128,9 @@ export function RawMaterials({
           />
         </label>
       )}
+      {editable && (
+        <CasForm organizationId={membership.organization_id} onDone={reload} onError={setError} />
+      )}
       {error && (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
@@ -179,7 +184,7 @@ export function RawMaterials({
                 </span>
                 <StatePill state={state} />
               </button>
-              {canDelete && state.kind === 'no_document' && (
+              {canDelete && (state.kind === 'no_document' || state.kind === 'by_cas') && (
                 <button
                   type="button"
                   onClick={() => void remove(m)}
@@ -238,4 +243,198 @@ async function uploadOne(organizationId: string, file: File): Promise<string | n
   });
   if (fnError) return `${file.name}: okuma başlatılamadı (${fnError.message}).`;
   return null;
+}
+
+interface CasRow {
+  name: string;
+  cas: string;
+  min: string;
+  max: string;
+}
+
+const emptyRow = (): CasRow => ({ name: '', cas: '', min: '', max: '' });
+const toNumber = (s: string) => Number(s.replace(',', '.').trim());
+
+/** Adds a raw material from known CAS numbers, for when no supplier SDS is at hand. */
+function CasForm({
+  organizationId,
+  onDone,
+  onError,
+}: {
+  organizationId: string;
+  onDone: () => void;
+  onError: (message: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [tradeName, setTradeName] = useState('');
+  const [rows, setRows] = useState<CasRow[]>([emptyRow()]);
+  const [problems, setProblems] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const setRow = (i: number, patch: Partial<CasRow>) =>
+    setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  async function save() {
+    const found: string[] = [];
+    if (!tradeName.trim()) found.push('Hammadde adı boş.');
+    rows.forEach((r, i) => {
+      const n = i + 1;
+      if (!r.name.trim()) found.push(`${n}. satır: bileşen adı boş.`);
+      if (!isValidCas(r.cas))
+        found.push(`${n}. satır: CAS numarası geçersiz (kontrol hanesi tutmuyor).`);
+      const min = r.min.trim() === '' ? null : toNumber(r.min);
+      const max = r.max.trim() === '' ? null : toNumber(r.max);
+      if ((min !== null && !Number.isFinite(min)) || (max !== null && !Number.isFinite(max)))
+        found.push(`${n}. satır: oran okunamadı.`);
+      else if ((min !== null && (min < 0 || min > 100)) || (max !== null && (max < 0 || max > 100)))
+        found.push(`${n}. satır: oran 0 ile 100 arasında olmalı.`);
+      else if (min !== null && max !== null && min > max)
+        found.push(`${n}. satır: alt oran üst orandan büyük.`);
+    });
+    setProblems(found);
+    if (found.length > 0) return;
+
+    setSaving(true);
+    onError(null);
+    const { data: material, error: rmError } = await supabase
+      .from('raw_materials')
+      .insert({ organization_id: organizationId, trade_name: tradeName.trim() })
+      .select('id')
+      .single();
+    if (rmError || !material) {
+      setSaving(false);
+      onError(`Hammadde kaydı oluşturulamadı (${rmError?.message}).`);
+      return;
+    }
+    const { error: compError } = await supabase.from('raw_material_components').insert(
+      rows.map((r) => ({
+        organization_id: organizationId,
+        raw_material_id: material.id,
+        name_as_written: r.name.trim(),
+        cas_number: r.cas.trim(),
+        concentration_min: r.min.trim() === '' ? null : toNumber(r.min),
+        concentration_max: r.max.trim() === '' ? null : toNumber(r.max),
+        concentration_raw: `${r.min.trim()}–${r.max.trim()}`,
+      })),
+    );
+    if (compError) {
+      // No half-made raw material is left behind.
+      await supabase.from('raw_materials').delete().eq('id', material.id);
+      setSaving(false);
+      onError(`Bileşenler kaydedilemedi (${compError.message}).`);
+      return;
+    }
+    setSaving(false);
+    setOpen(false);
+    setTradeName('');
+    setRows([emptyRow()]);
+    onDone();
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="justify-self-start text-sm font-semibold text-sky-800 underline"
+      >
+        SDS'im yok, CAS numarasıyla hammadde ekle
+      </button>
+    );
+  }
+
+  const input = 'rounded-md border border-slate-300 px-2 py-1 text-sm';
+  return (
+    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        CAS numarasıyla hammadde
+      </h2>
+      <p className="text-sm text-slate-500">
+        Sınıflandırma yalnızca KDU onaylı SEA Ek-6 listesinden gelir. Listede olmayan veya
+        listelenmeyen sınıflar için "veri yok" uyarısı çıkar ve SDS taslak kalır. Oranı bilmiyorsan
+        boş bırak.
+      </p>
+      <label className="grid gap-1 text-sm">
+        Hammadde adı
+        <input className={input} value={tradeName} onChange={(e) => setTradeName(e.target.value)} />
+      </label>
+      {rows.map((r, i) => (
+        <div key={i} className="grid grid-cols-[2fr_1.2fr_0.7fr_0.7fr_auto] items-end gap-2">
+          <label className="grid gap-1 text-xs">
+            Bileşen adı
+            <input
+              className={input}
+              value={r.name}
+              onChange={(e) => setRow(i, { name: e.target.value })}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            CAS
+            <input
+              className={input}
+              value={r.cas}
+              placeholder="67-64-1"
+              onChange={(e) => setRow(i, { cas: e.target.value })}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            En az %
+            <input
+              className={input}
+              value={r.min}
+              onChange={(e) => setRow(i, { min: e.target.value })}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            En çok %
+            <input
+              className={input}
+              value={r.max}
+              onChange={(e) => setRow(i, { max: e.target.value })}
+            />
+          </label>
+          {rows.length > 1 && (
+            <button
+              type="button"
+              className="pb-1 text-xs text-red-700 underline"
+              onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
+            >
+              Kaldır
+            </button>
+          )}
+        </div>
+      ))}
+      <button
+        type="button"
+        className="justify-self-start text-xs font-semibold text-sky-800 underline"
+        onClick={() => setRows((rs) => [...rs, emptyRow()])}
+      >
+        + Bileşen ekle
+      </button>
+      {problems.length > 0 && (
+        <ul role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {problems.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void save()}
+          className="rounded-md bg-sky-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {saving ? 'Kaydediliyor…' : 'Kaydet'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-sm text-slate-600 underline"
+        >
+          Vazgeç
+        </button>
+      </div>
+    </section>
+  );
 }

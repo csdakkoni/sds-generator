@@ -15,6 +15,7 @@ import {
   type SpecificConcentrationLimit,
 } from '@sds/classification-engine';
 import type { HarmonisedEntry } from './ek6';
+import { agreementLabel, type ConfirmedProfile, type OutsideSummary } from './outside-summary';
 import type { ClassificationLine, Extraction, ManualComponent } from './types';
 
 export interface RecipeLine {
@@ -187,21 +188,50 @@ interface Collected {
   sources: Record<string, string>;
 }
 
+/** Outside-source data for substances entered by CAS number (see lib/outside.ts). */
+export interface OutsideData {
+  summaries?: Record<string, OutsideSummary>;
+  confirmed?: Record<string, ConfirmedProfile>;
+}
+
 /**
- * A raw material entered by CAS number has no supplier classification. Its only hazard data
- * is the verified Annex 6 entry; where there is none, the component stays "unknown" and the
- * engine blocks finalising (CLAUDE.md rule 5).
+ * The Annex 6 entry as the engine takes it. An entry no person has checked yet (note letters,
+ * specific limits) is used in the draft, but blocks finalising until it is checked.
+ */
+function harmonisedFor(
+  entry: HarmonisedEntry,
+  label: string,
+  notes: EngineWarning[],
+): { reference: string; classifications: { category: string; hCode: string }[] } {
+  if (!entry.verified) {
+    notes.push(
+      warn(
+        'blocking',
+        'RECIPE_EK6_UNVERIFIED',
+        `${label}: ${entry.reference} kaydı henüz kişi tarafından doğrulanmadı${entry.caveat ? ` (${entry.caveat})` : ''}; taslakta kullanıldı. Kesinleştirmek için Kütüphane'deki madde sayfasında doğrulanmalı.`,
+      ),
+    );
+  }
+  return { reference: entry.reference, classifications: entry.classifications };
+}
+
+/**
+ * A raw material entered by CAS number has no supplier classification. Its hazard data, in
+ * order: the Annex 6 entry (always a floor), the firm KDU's confirmed outside-source profile,
+ * or, until a KDU confirms, the outside sources' most severe lines as a draft that blocks
+ * finalising. With none of these the component stays "unknown" (CLAUDE.md rule 5).
  */
 function addManual(
   line: RecipeLine,
   name: string,
   manual: ManualComponent[],
   harmonised: Record<string, HarmonisedEntry>,
+  outside: OutsideData,
   out: Collected,
 ): void {
   const pMin = Number(line.percent_min);
   const pMax = Number(line.percent_max);
-  let fromEk6 = 0;
+  const counts = { ek6: 0, confirmed: 0, draft: 0, none: 0 };
   manual.forEach((c, i) => {
     const label = `${c.name_as_written} (${name})`;
     let cMin = c.concentration_min;
@@ -217,28 +247,72 @@ function addManual(
         ),
       );
     }
-    const official = c.cas_number ? harmonised[c.cas_number] : undefined;
-    if (official) fromEk6 += 1;
+    const cas = c.cas_number;
+    const official = cas ? harmonised[cas] : undefined;
+    const confirmed = cas ? outside.confirmed?.[cas] : undefined;
+    const summary = cas ? outside.summaries?.[cas] : undefined;
+    let hazardData: ComponentInput['hazardData'] = 'unknown';
+    let classifications: ComponentClassification[] = [];
+
+    if (confirmed) {
+      counts.confirmed += 1;
+      classifications = confirmed.lines;
+      hazardData = classifications.length > 0 ? 'classified' : 'not_classified';
+    } else if (summary && summary.sources.length > 0) {
+      counts.draft += 1;
+      classifications = summary.draftLines.map((l) => ({ category: l.category, hCode: l.hCode }));
+      const allNotClassified = summary.sources.every((s) => s.record.not_classified);
+      hazardData =
+        classifications.length > 0 ? 'classified' : allNotClassified ? 'not_classified' : 'unknown';
+      const sourceNames = summary.sources.map((s) => s.record.name ?? s.record.source_id);
+      const uncertain = summary.draftLines.filter((l) => l.uncertain);
+      out.notes.push(
+        warn(
+          'blocking',
+          'RECIPE_OUTSIDE_UNCONFIRMED',
+          `${label}: sınıflandırma onaylanmamış dış kaynaklardan (${sourceNames.join(', ')}) taslak olarak alındı; ${agreementLabel(summary)}.${uncertain.length > 0 ? ` Kategorisi kaynakta yazmayan: ${uncertain.map((l) => `${l.hCode} (en ağır varsayıldı: ${l.category})`).join(', ')}.` : ''} Kesinleştirmek için KDU Kütüphane'de onaylamalı.`,
+        ),
+      );
+      const notEvaluated = [...new Set(summary.sources.flatMap((s) => s.notEvaluated))];
+      if (notEvaluated.length > 0) {
+        out.notes.push(
+          warn(
+            'review',
+            'RECIPE_OUTSIDE_NOT_EVALUATED',
+            `${label}: kaynaklar motorun değerlendirmediği sınıflar da bildiriyor (${notEvaluated.join(', ')}); karışımın fiziksel tehlikeleri ölçülmüş veriyle belirlenir, diğerlerini KDU değerlendirmeli.`,
+          ),
+        );
+      }
+    } else if (!official) {
+      counts.none += 1;
+    }
+    if (official) counts.ek6 += 1;
+
     const id = `${line.id}:${i}`;
-    out.cas[id] = c.cas_number;
+    out.cas[id] = cas;
     out.names[id] = c.name_as_written;
     out.ec[id] = null;
     out.components.push({
       id,
       name: label,
       concentration: { min: (pMin * cMin) / 100, max: (pMax * cMax) / 100 },
-      hazardData: 'unknown',
-      classifications: [],
-      ...(official ? { harmonised: official } : {}),
+      hazardData,
+      classifications,
+      ...(official ? { harmonised: harmonisedFor(official, label, out.notes) } : {}),
     });
   });
-  out.sources[line.id] =
-    fromEk6 === 0 ? 'KDU kontrolünde' : `SEA Ek-6 (${fromEk6}/${manual.length} bileşen), SDS yok`;
+  const parts = [
+    counts.ek6 > 0 && `SEA Ek-6 (${counts.ek6})`,
+    counts.confirmed > 0 && `KDU onaylı dış kaynak (${counts.confirmed})`,
+    counts.draft > 0 && `dış kaynak, onay bekliyor (${counts.draft})`,
+    counts.none > 0 && `veri yok (${counts.none})`,
+  ].filter(Boolean);
+  out.sources[line.id] = `${parts.join(' + ')}, SDS yok`;
   out.notes.push(
     warn(
       'info',
       'RECIPE_MATERIAL_BY_CAS',
-      `${name}: tedarikçi SDS'i yok, bileşenler CAS numarasıyla girildi. Yalnızca KDU onaylı SEA Ek-6 verisi kullanıldı.`,
+      `${name}: tedarikçi SDS'i yok, bileşenler CAS numarasıyla girildi. Sınıflandırma SEA Ek-6'dan ve dış kaynaklardan geliyor.`,
     ),
   );
 }
@@ -253,6 +327,7 @@ export function buildMixture(
   materials: RecipeMaterial[],
   measurements: MeasurementRow[],
   harmonised: Record<string, HarmonisedEntry> = {},
+  outside: OutsideData = {},
 ): {
   input: MixtureInput;
   notes: EngineWarning[];
@@ -280,7 +355,7 @@ export function buildMixture(
     const extraction = material?.approvedExtraction;
 
     if (!extraction && material?.manualComponents?.length) {
-      addManual(line, name, material.manualComponents, harmonised, {
+      addManual(line, name, material.manualComponents, harmonised, outside, {
         components,
         notes,
         cas,
@@ -382,7 +457,7 @@ export function buildMixture(
         hazardData: c.classifications.length > 0 ? 'classified' : 'not_classified',
         classifications,
         ...componentDetails(c),
-        ...(official ? { harmonised: official } : {}),
+        ...(official ? { harmonised: harmonisedFor(official, label, notes) } : {}),
       });
     });
     sources[line.id] =

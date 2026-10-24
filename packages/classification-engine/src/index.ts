@@ -10,4 +10,11 @@ export { classifyMixture } from './classify';
 export { ENGINE_VERSION } from './version';
 export * from './types';
 export { compareSources } from './source-agreement';
+export {
+  categoriesForHCode,
+  conservativeLines,
+  hazardClassOf,
+  resolveStatements,
+  type SourceLine,
+} from './statements';
 export type { Agreement, SourceClassification, SourceDifference } from './source-agreement';

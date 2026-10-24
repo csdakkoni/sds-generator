@@ -1,5 +1,5 @@
 import { classKey } from './harmonised';
-import type { ComponentClassification } from './types';
+import type { SourceLine } from './statements';
 
 /**
  * Compares the classifications of one substance from several data sources.
@@ -16,7 +16,7 @@ export interface SourceClassification {
   family: string;
   /** Human-readable reference shown to the KDU. */
   reference: string;
-  lines: ComponentClassification[];
+  lines: SourceLine[];
 }
 
 export interface SourceDifference {
@@ -32,7 +32,8 @@ export type Agreement =
   | { status: 'agreed'; families: number; differences: []; trace: string }
   | { status: 'conflict'; families: number; differences: SourceDifference[]; trace: string };
 
-const label = (l: ComponentClassification) => `${l.category} (${l.hCode})`;
+const UNCERTAIN = ' (kategori kaynakta yok)';
+const label = (l: SourceLine) => `${l.category} (${l.hCode})${l.uncertain ? UNCERTAIN : ''}`;
 
 /** One family's view: per hazard class the sorted lines it lists. */
 function view(sources: SourceClassification[]): Map<string, string> {
@@ -72,7 +73,11 @@ export function compareSources(sources: SourceClassification[]): Agreement {
     const byFamily = Object.fromEntries(
       names.map((n) => [n, views.get(n)?.get(hazardClass) ?? null]),
     );
-    if (new Set(Object.values(byFamily)).size > 1) differences.push({ hazardClass, byFamily });
+    // A category a source does not state is never an agreement, even if two sources match.
+    const uncertain = Object.values(byFamily).some((v) => v?.includes(UNCERTAIN));
+    if (uncertain || new Set(Object.values(byFamily)).size > 1) {
+      differences.push({ hazardClass, byFamily });
+    }
   }
 
   if (differences.length === 0) {
@@ -87,6 +92,6 @@ export function compareSources(sources: SourceClassification[]): Agreement {
     status: 'conflict',
     families: names.length,
     differences,
-    trace: `${names.length} bağımsız kaynak ailesi arasında ${differences.length} sınıfta fark var; sistem seçim yapmaz, KDU değerlendirir.`,
+    trace: `${names.length} bağımsız kaynak ailesi arasında ${differences.length} sınıfta fark veya belirsizlik var; sistem seçim yapmaz, KDU değerlendirir.`,
   };
 }

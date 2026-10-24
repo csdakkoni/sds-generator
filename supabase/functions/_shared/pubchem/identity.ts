@@ -40,9 +40,10 @@ export function parseIdentity(
   synonyms: SynonymsResponse,
   properties: PropertyResponse,
 ): SubstanceIdentity | null {
-  const info = synonyms.InformationList?.Information?.[0];
+  // A CAS number can match several records; take the first that lists it.
+  const info = synonyms.InformationList?.Information?.find((i) => i.Synonym?.includes(cas));
   const list = info?.Synonym ?? [];
-  if (!info?.CID || !list.includes(cas)) return null;
+  if (!info?.CID) return null;
   const props = properties.PropertyTable?.Properties?.find((p) => p.CID === info.CID);
   const name = props?.Title?.trim() || list.find((s) => s !== cas && !EC_SHAPE.test(s));
   if (!name) return null;

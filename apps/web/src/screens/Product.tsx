@@ -6,10 +6,12 @@ import {
   parseRecipePaste,
   type MeasurementKey,
   type MeasurementRow,
+  type OutsideData,
   type RecipeLine,
   type RecipeMaterial,
 } from '../lib/mixture';
 import { loadHarmonised, type HarmonisedEntry } from '../lib/ek6';
+import { loadConfirmed, loadOutside } from '../lib/outside';
 import { canEdit } from '../lib/review';
 import { supabase } from '../lib/supabase';
 import type { DataSource } from '../lib/sds/content';
@@ -124,8 +126,10 @@ export function Product({
     };
   }, [productId, org, version]);
 
-  // Verified Annex 6 entries for the CAS numbers of the approved supplier SDS components.
+  // Annex 6 entries for every CAS number in the recipe, and for the components entered by CAS
+  // number the outside sources and the firm KDU's confirmations.
   const [harmonised, setHarmonised] = useState<Record<string, HarmonisedEntry>>({});
+  const [outside, setOutside] = useState<OutsideData>({});
   useEffect(() => {
     if (!data) return;
     const used = new Set(data.lines.map((l) => l.raw_material_id));
@@ -136,19 +140,25 @@ export function Product({
         ...m.raw_material_components.map((c) => c.cas_number),
       ])
       .filter((v): v is string => !!v);
+    const manualCas = data.materials
+      .filter((m) => used.has(m.id))
+      .flatMap((m) => m.raw_material_components.map((c) => c.cas_number))
+      .filter((v): v is string => !!v);
     let active = true;
-    void loadHarmonised(cas)
-      .then((found) => {
-        if (active) setHarmonised(found);
+    void Promise.all([loadHarmonised(cas), loadOutside(manualCas), loadConfirmed(org, manualCas)])
+      .then(([found, summaries, confirmed]) => {
+        if (!active) return;
+        setHarmonised(found);
+        setOutside({ summaries, confirmed });
       })
       .catch((e: unknown) => {
         if (active)
-          setError(`Ek-6 verisi okunamadı: ${e instanceof Error ? e.message : String(e)}`);
+          setError(`Madde verisi okunamadı: ${e instanceof Error ? e.message : String(e)}`);
       });
     return () => {
       active = false;
     };
-  }, [data]);
+  }, [data, org]);
 
   const computed = useMemo(() => {
     if (!data || data.lines.length === 0) return null;
@@ -157,6 +167,7 @@ export function Product({
       data.materials.map(toRecipeMaterial),
       data.measurements,
       harmonised,
+      outside,
     );
     // The supplier SDS revisions the result rests on, for section 16 and the revision record.
     const used = new Set(data.lines.map((l) => l.raw_material_id));
@@ -192,7 +203,7 @@ export function Product({
       dataSources,
       measurements,
     };
-  }, [data, harmonised]);
+  }, [data, harmonised, outside]);
 
   async function addLines(lines: { rawMaterialId: string; min: number; max: number }[]) {
     if (!data || lines.length === 0) return;

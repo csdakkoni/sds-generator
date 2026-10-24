@@ -68,7 +68,7 @@ export function applyHarmonised(raw: ComponentInput): {
 }
 
 /** Lines of the same hazard class (and, for acute toxicity, the same route) compete. */
-function classKey(line: ComponentClassification): string {
+export function classKey(line: ComponentClassification): string {
   if (!isHazardCategory(line.category)) return `other:${line.category}`;
   const info = categoryInfo(line.category);
   if (info.hazardClass === 'acute_toxicity') {

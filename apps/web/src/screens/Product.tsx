@@ -167,7 +167,12 @@ export function Product({
         return d
           ? [
               {
-                rawMaterial: m.trade_name,
+                // Section 16 lists substances, never the trade name.
+                rawMaterial:
+                  (d.extraction?.components ?? [])
+                    .map((c) => c.name.value)
+                    .filter(Boolean)
+                    .join(' / ') || 'Hammadde',
                 fileName: d.file_name,
                 supplierRevision: d.revision_number,
                 approvedAt: d.approved_at,

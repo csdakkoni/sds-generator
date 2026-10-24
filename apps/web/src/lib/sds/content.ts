@@ -230,6 +230,8 @@ export function composeContent(args: {
     notes: EngineWarning[];
     cas: Record<string, string | null>;
     ec: Record<string, string | null>;
+    /** Substance names for printing; the engine's own names may carry trade names. */
+    names?: Record<string, string>;
   };
   result: ClassificationResult;
   dataSources: DataSource[];
@@ -241,7 +243,7 @@ export function composeContent(args: {
     inputs: args.inputs,
     measurements: [...args.measurements].sort((a, b) => a.property.localeCompare(b.property)),
     composition: args.mixture.input.components.map((c) => ({
-      name: c.name,
+      name: args.mixture.names?.[c.id] ?? c.name,
       ec: args.mixture.ec[c.id] ?? null,
       cas: args.mixture.cas[c.id] ?? null,
       min: c.concentration.min,

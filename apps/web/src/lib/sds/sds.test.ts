@@ -39,7 +39,7 @@ function extraction(category: string, hCode: string): Extraction {
   };
 }
 
-function content(category = 'Eye Dam. 1', hCode = 'H318'): SdsContent {
+function content(category = 'Eye Dam. 1', hCode = 'H318', trade = 'Etken'): SdsContent {
   const water: Extraction = {
     ...extraction(category, hCode),
     components: [],
@@ -51,7 +51,7 @@ function content(category = 'Eye Dam. 1', hCode = 'H318'): SdsContent {
       { id: 'l2', raw_material_id: 'w', percent_min: 80, percent_max: 80 },
     ],
     [
-      { id: 'a', trade_name: 'Etken', approvedExtraction: extraction(category, hCode) },
+      { id: 'a', trade_name: trade, approvedExtraction: extraction(category, hCode) },
       { id: 'w', trade_name: 'Su', approvedExtraction: water },
     ],
     [
@@ -110,6 +110,14 @@ describe('SDS sections', () => {
     }
     expect(allText(c, 'tr')).toContain('H318: Ciddi göz hasarına yol açar.');
     expect(allText(c, 'en')).toContain('H318');
+  });
+
+  it('prints substance names, never the raw material trade name', () => {
+    const c = content('Eye Dam. 1', 'H318', 'TicariAdX');
+    expect(c.composition.map((l) => l.name)).toContain('Alkil eter');
+    for (const lang of ['tr', 'en'] as const) {
+      expect(allText(c, lang)).not.toContain('TicariAdX');
+    }
   });
 
   it('shows the EC number next to the CAS number in section 3', () => {

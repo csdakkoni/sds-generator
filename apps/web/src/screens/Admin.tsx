@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Ek6Verification } from './Ek6Verification';
 import { RegulationWatch } from './RegulationWatch';
-import { SubstanceLibrary } from './SubstanceLibrary';
 
 interface Ek6File {
   count: number;
@@ -212,8 +211,6 @@ export function Admin() {
       <Ek6Verification />
 
       <RegulationWatch />
-
-      <SubstanceLibrary />
     </div>
   );
 }

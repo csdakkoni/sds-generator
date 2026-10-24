@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { canEdit, hasRole, materialState, nameFromFile, type MaterialState } from '../lib/review';
 import { isValidCas } from '../lib/cas';
+import { lookupCas, type CasInfo } from '../lib/cas-lookup';
 import { supabase } from '../lib/supabase';
 import type { Membership, RawMaterial } from '../lib/types';
 
@@ -246,6 +247,7 @@ async function uploadOne(organizationId: string, file: File): Promise<string | n
 }
 
 interface CasRow {
+  info?: CasInfo | 'searching' | undefined;
   name: string;
   cas: string;
   min: string;
@@ -273,6 +275,21 @@ function CasForm({
 
   const setRow = (i: number, patch: Partial<CasRow>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  /** Fills the name from the library or PubChem as soon as a valid CAS number is typed. */
+  async function lookUp(i: number, cas: string) {
+    const number = cas.trim();
+    if (!isValidCas(number)) return;
+    setRow(i, { info: 'searching' });
+    const info = await lookupCas(number);
+    setRows((rs) =>
+      rs.map((r, j) =>
+        j === i && r.cas.trim() === number
+          ? { ...r, info, name: r.name.trim() === '' && info.name ? info.name : r.name }
+          : r,
+      ),
+    );
+  }
 
   async function save() {
     const found: string[] = [];
@@ -374,7 +391,8 @@ function CasForm({
               className={input}
               value={r.cas}
               placeholder="67-64-1"
-              onChange={(e) => setRow(i, { cas: e.target.value })}
+              onChange={(e) => setRow(i, { cas: e.target.value, info: undefined })}
+              onBlur={(e) => void lookUp(i, e.target.value)}
             />
           </label>
           <label className="grid gap-1 text-xs">
@@ -401,6 +419,11 @@ function CasForm({
             >
               Kaldır
             </button>
+          )}
+          {r.info && (
+            <small className="col-span-full text-slate-500">
+              {r.info === 'searching' ? 'Aranıyor…' : r.info.message}
+            </small>
           )}
         </div>
       ))}

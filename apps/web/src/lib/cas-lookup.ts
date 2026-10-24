@@ -1,45 +1,68 @@
-import { loadHarmonised } from './ek6';
+import { loadHarmonised, type HarmonisedEntry } from './ek6';
+import {
+  agreementLabel,
+  fetchOutside,
+  loadConfirmed,
+  loadOutside,
+  type ConfirmedProfile,
+  type OutsideSummary,
+} from './outside';
 import { supabase } from './supabase';
 
 export interface CasInfo {
   /** Name to pre-fill, when one was found. */
   name: string | null;
-  /** Where it came from and what is known, in Turkish, shown under the row. */
+  substanceId: string | null;
+  ek6: HarmonisedEntry | null;
+  summary: OutsideSummary | null;
+  confirmed: ConfirmedProfile | null;
+  /** Where the data stands, in Turkish, shown under the row. */
   message: string;
 }
 
 /**
- * Identity of a CAS number: the platform library first, PubChem (through the server) when the
- * library does not have it. Also reports whether a verified SEA Annex 6 classification exists.
- * Identity only; PubChem hazard data is never used.
+ * Everything known about a CAS number: the server first looks it up at PubChem and keeps the
+ * identity and each source's record in the library (cached for 30 days), then the library is
+ * read with the signed-in person's rights (licence rules apply).
  */
-export async function lookupCas(cas: string): Promise<CasInfo> {
-  const { data: substance } = await supabase
-    .from('substances')
-    .select('name, synonyms')
-    .eq('cas_number', cas)
-    .maybeSingle();
-  let name: string | null = substance?.name ?? null;
-  let origin = 'kütüphaneden';
-  if (!name) {
-    const { data, error } = await supabase.functions.invoke('lookup-cas', { body: { cas } });
-    const found = error ? null : (data as { found?: boolean; identity?: { name: string } });
-    if (found?.found && found.identity) {
-      name = found.identity.name;
-      origin = 'PubChem';
-    }
-  }
-  let official = false;
-  try {
-    official = cas in (await loadHarmonised([cas]));
-  } catch {
-    // The Annex 6 check is informative here; the recipe screen repeats it.
-  }
-  const ek6 = official
-    ? "SEA Ek-6'da doğrulanmış sınıflandırması var, otomatik kullanılır."
-    : "SEA Ek-6'da doğrulanmış sınıflandırması yok; tehlike verisi eksik sayılır, SDS taslak kalır.";
+export async function lookupCas(cas: string, organizationId: string): Promise<CasInfo> {
+  const fetched = await fetchOutside(cas);
+  const [{ data: substance }, ek6, outside, confirmed] = await Promise.all([
+    supabase.from('substances').select('id, name').eq('cas_number', cas).maybeSingle(),
+    loadHarmonised([cas]).catch(() => ({}) as Record<string, HarmonisedEntry>),
+    loadOutside([cas]).catch(() => ({}) as Record<string, OutsideSummary>),
+    loadConfirmed(organizationId, [cas]).catch(() => ({}) as Record<string, ConfirmedProfile>),
+  ]);
+  const name = (substance?.name as string | undefined) ?? fetched.name;
+  const entry = ek6[cas] ?? null;
+  const summary = outside[cas] ?? null;
+  const own = confirmed[cas] ?? null;
+  const parts = [
+    name ? `${name}.` : 'Ad bulunamadı, elle yaz.',
+    entry
+      ? entry.verified
+        ? 'SEA Ek-6: doğrulanmış.'
+        : `SEA Ek-6: var, henüz doğrulanmadı${entry.caveat ? ` (${entry.caveat})` : ''}.`
+      : "SEA Ek-6'da yok.",
+    own ? 'Dış kaynak sınıflandırması KDU onaylı.' : `${agreementLabel(summary ?? undefined)}.`,
+  ];
+  if (fetched.error) parts.push(`PubChem'e ulaşılamadı (${fetched.error}).`);
   return {
     name,
-    message: name ? `${name} (${origin}). ${ek6}` : `Ad bulunamadı, elle yaz. ${ek6}`,
+    substanceId: (substance?.id as string | undefined) ?? null,
+    ek6: entry,
+    summary,
+    confirmed: own,
+    message: parts.join(' '),
   };
+}
+
+/**
+ * What a substance still needs from a KDU: nothing (confirmed), one click (independent sources
+ * agree; UX principle 5 keeps such records off the KDU list), or a place on the KDU list
+ * (sources differ, only one source, or no data beyond Annex 6).
+ */
+export function kduState(info: CasInfo): 'done' | 'one_click' | 'list' {
+  if (info.confirmed) return 'done';
+  return info.summary?.agreement.status === 'agreed' ? 'one_click' : 'list';
 }

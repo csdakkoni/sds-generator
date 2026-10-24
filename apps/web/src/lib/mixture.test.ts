@@ -1,6 +1,7 @@
 import { classifyMixture } from '@sds/classification-engine';
 import { describe, expect, it } from 'vitest';
 import { buildMixture, parseRecipePaste, toMeasurements } from './mixture';
+import { summarise } from './outside-summary';
 import type { ClassificationLine, Extraction } from './types';
 
 const src = { page: 3, quote: 'x' };
@@ -70,6 +71,9 @@ describe('buildMixture', () => {
         '1-1-1': {
           reference: 'SEA Ek-6 liste no 000-000-00-0',
           classifications: [{ category: 'Eye Dam. 1', hCode: 'H318' }],
+          verified: true,
+          caveat: null,
+          profileId: 'p1',
         },
       },
     );
@@ -104,19 +108,102 @@ describe('buildMixture', () => {
       '1-1-1': {
         reference: 'SEA Ek-6 liste no 000-000-00-0',
         classifications: [{ category: 'Eye Dam. 1', hCode: 'H318' }],
+        verified: true,
+        caveat: null,
+        profileId: 'p1',
       },
     });
     const c = listed.input.components[0];
     expect(c?.concentration).toEqual({ min: 5, max: 20 });
     expect(c?.hazardData).toBe('unknown');
     expect(listed.cas['l1:0']).toBe('1-1-1');
-    expect(listed.sources.l1).toBe('SEA Ek-6 (1/1 bileşen), SDS yok');
+    expect(listed.sources.l1).toBe('SEA Ek-6 (1), SDS yok');
     // Supplier data is missing, so the form cannot be finalised.
     expect(classifyMixture(listed.input).canFinalize).toBe(false);
 
     const unlisted = buildMixture([...recipe], [material], []);
-    expect(unlisted.sources.l1).toBe('KDU kontrolünde');
+    expect(unlisted.sources.l1).toBe('veri yok (1), SDS yok');
     expect(classifyMixture(unlisted.input).canFinalize).toBe(false);
+  });
+
+  describe('raw material entered by CAS with outside sources', () => {
+    const recipe = [{ id: 'l1', raw_material_id: 'rm', percent_min: 100, percent_max: 100 }];
+    const material = {
+      id: 'rm',
+      trade_name: 'Ticari',
+      approvedExtraction: null,
+      manualComponents: [
+        {
+          id: 'c1',
+          name_as_written: 'Madde A',
+          cas_number: '1-1-1',
+          concentration_min: 100,
+          concentration_max: 100,
+          sds_document_id: null,
+        },
+      ],
+    };
+    const record = (source_id: string, family: string, hCodes: string[]) => ({
+      source_id,
+      family,
+      name: source_id,
+      reference: 'ref',
+      lines: hCodes.map((hCode) => ({ hCode, text: hCode })),
+      category_texts: [],
+      not_classified: false,
+      fetched_at: '2026-10-24',
+      snapshot: null,
+    });
+
+    it('drafts with the most severe line of the sources and blocks finalising', () => {
+      const summaries = {
+        '1-1-1': summarise('1-1-1', [
+          record('nite', 'jp_nite', ['H319']),
+          record('nz', 'nz_epa', ['H318']),
+        ]),
+      };
+      const m = buildMixture(recipe, [material], [], {}, { summaries });
+      expect(m.input.components[0]?.classifications).toEqual([
+        { category: 'Eye Dam. 1', hCode: 'H318' },
+      ]);
+      expect(m.sources.l1).toBe('dış kaynak, onay bekliyor (1), SDS yok');
+      expect(m.notes.some((n) => n.code === 'RECIPE_OUTSIDE_UNCONFIRMED')).toBe(true);
+      const result = classifyMixture(m.input);
+      expect(result.classifications.some((c) => c.category === 'Eye Dam. 1')).toBe(true);
+    });
+
+    it('uses the KDU-confirmed profile without a blocking note', () => {
+      const confirmed = {
+        '1-1-1': {
+          profileId: 'p',
+          reference: 'KDU',
+          lines: [{ category: 'Eye Irrit. 2', hCode: 'H319' }],
+          verifiedAt: '2026-10-24',
+        },
+      };
+      const m = buildMixture(recipe, [material], [], {}, { confirmed });
+      expect(m.input.components[0]?.hazardData).toBe('classified');
+      expect(m.sources.l1).toBe('KDU onaylı dış kaynak (1), SDS yok');
+      expect(m.notes.some((n) => n.severity === 'blocking')).toBe(false);
+    });
+
+    it('uses an unchecked Annex 6 entry in the draft but blocks finalising', () => {
+      const m = buildMixture(recipe, [material], [], {
+        '1-1-1': {
+          reference: 'SEA Ek-6 liste no 1',
+          classifications: [{ category: 'Carc. 1B', hCode: 'H350' }],
+          verified: false,
+          caveat: 'Not K',
+          profileId: 'p',
+        },
+      });
+      expect(m.input.components[0]?.harmonised?.classifications).toEqual([
+        { category: 'Carc. 1B', hCode: 'H350' },
+      ]);
+      const note = m.notes.find((n) => n.code === 'RECIPE_EK6_UNVERIFIED');
+      expect(note?.severity).toBe('blocking');
+      expect(note?.message).toContain('Not K');
+    });
   });
 
   it('without an Annex 6 entry the source is the supplier SDS only', () => {

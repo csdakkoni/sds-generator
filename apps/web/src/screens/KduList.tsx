@@ -84,7 +84,11 @@ export function KduList({ userId }: { userId: string }) {
               </div>
               <p className="mt-1 text-sm font-medium text-slate-900">
                 {url ? (
-                  <a href={url} target="_blank" rel="noreferrer" className="text-sky-800 underline">
+                  <a
+                    href={url}
+                    {...(url.startsWith('#') ? {} : { target: '_blank', rel: 'noreferrer' })}
+                    className="text-sky-800 underline"
+                  >
                     {item.title}
                   </a>
                 ) : (

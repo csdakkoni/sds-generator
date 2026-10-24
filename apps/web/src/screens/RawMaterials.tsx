@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { canEdit, hasRole, materialState, nameFromFile, type MaterialState } from '../lib/review';
 import { isValidCas } from '../lib/cas';
-import { lookupCas, type CasInfo } from '../lib/cas-lookup';
+import { kduState, lookupCas, type CasInfo } from '../lib/cas-lookup';
+import { confirmOutside, ensureReviewItem } from '../lib/outside';
 import { supabase } from '../lib/supabase';
 import type { Membership, RawMaterial } from '../lib/types';
 
@@ -28,9 +29,11 @@ function StatePill({ state }: { state: MaterialState }) {
 
 export function RawMaterials({
   membership,
+  userId,
   onOpen,
 }: {
   membership: Membership;
+  userId: string;
   onOpen: (rawMaterialId: string) => void;
 }) {
   const [items, setItems] = useState<RawMaterial[] | null>(null);
@@ -130,7 +133,13 @@ export function RawMaterials({
         </label>
       )}
       {editable && (
-        <CasForm organizationId={membership.organization_id} onDone={reload} onError={setError} />
+        <CasForm
+          organizationId={membership.organization_id}
+          userId={userId}
+          isKdu={hasRole(membership, 'kdu')}
+          onDone={reload}
+          onError={setError}
+        />
       )}
       {error && (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -260,10 +269,14 @@ const toNumber = (s: string) => Number(s.replace(',', '.').trim());
 /** Adds a raw material from known CAS numbers, for when no supplier SDS is at hand. */
 function CasForm({
   organizationId,
+  userId,
+  isKdu,
   onDone,
   onError,
 }: {
   organizationId: string;
+  userId: string;
+  isKdu: boolean;
   onDone: () => void;
   onError: (message: string | null) => void;
 }) {
@@ -281,7 +294,7 @@ function CasForm({
     const number = cas.trim();
     if (!isValidCas(number)) return;
     setRow(i, { info: 'searching' });
-    const info = await lookupCas(number);
+    const info = await lookupCas(number, organizationId);
     setRows((rs) =>
       rs.map((r, j) =>
         j === i && r.cas.trim() === number
@@ -289,6 +302,22 @@ function CasForm({
           : r,
       ),
     );
+  }
+
+  /** One click for a KDU when independent sources agree (UX principle 5). */
+  async function confirm(i: number, info: CasInfo) {
+    if (!info.summary || !info.substanceId) return;
+    onError(null);
+    const failed = await confirmOutside({
+      organizationId,
+      userId,
+      substanceId: info.substanceId,
+      summary: info.summary,
+      lines: info.summary.draftLines.map((l) => ({ category: l.category, hCode: l.hCode })),
+      choice: 'kaynaklar uyumlu, önerilen sınıflandırma kabul edildi',
+    });
+    if (failed) onError(failed);
+    else await lookUp(i, rows[i]?.cas ?? '');
   }
 
   async function save() {
@@ -323,10 +352,17 @@ function CasForm({
       onError(`Hammadde kaydı oluşturulamadı (${rmError?.message}).`);
       return;
     }
+    // Every component is looked up, so the library has it and the KDU list knows what waits.
+    const infos = await Promise.all(
+      rows.map((r) =>
+        r.info && r.info !== 'searching' ? r.info : lookupCas(r.cas.trim(), organizationId),
+      ),
+    );
     const { error: compError } = await supabase.from('raw_material_components').insert(
-      rows.map((r) => ({
+      rows.map((r, i) => ({
         organization_id: organizationId,
         raw_material_id: material.id,
+        substance_id: infos[i]?.substanceId ?? null,
         name_as_written: r.name.trim(),
         cas_number: r.cas.trim(),
         concentration_min: r.min.trim() === '' ? null : toNumber(r.min),
@@ -341,6 +377,19 @@ function CasForm({
       onError(`Bileşenler kaydedilemedi (${compError.message}).`);
       return;
     }
+    await Promise.all(
+      infos.map((info, i) =>
+        info.substanceId && kduState(info) === 'list'
+          ? ensureReviewItem({
+              organizationId,
+              substanceId: info.substanceId,
+              cas: rows[i]?.cas.trim() ?? '',
+              name: info.name ?? rows[i]?.name.trim() ?? '',
+              summary: info.summary ?? undefined,
+            })
+          : Promise.resolve(),
+      ),
+    );
     setSaving(false);
     setOpen(false);
     setTradeName('');
@@ -422,7 +471,25 @@ function CasForm({
           )}
           {r.info && (
             <small className="col-span-full text-slate-500">
-              {r.info === 'searching' ? 'Aranıyor…' : r.info.message}
+              {r.info === 'searching' ? (
+                'Aranıyor (kütüphane ve PubChem)…'
+              ) : (
+                <>
+                  {r.info.message}{' '}
+                  <a href={`#/kutuphane/${r.cas.trim()}`} className="text-sky-800 underline">
+                    Madde sayfası
+                  </a>
+                  {isKdu && kduState(r.info) === 'one_click' && (
+                    <button
+                      type="button"
+                      onClick={() => r.info && r.info !== 'searching' && void confirm(i, r.info)}
+                      className="ml-2 font-semibold text-emerald-800 underline"
+                    >
+                      Onayla
+                    </button>
+                  )}
+                </>
+              )}
             </small>
           )}
         </div>

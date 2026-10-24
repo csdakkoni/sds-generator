@@ -11,6 +11,7 @@ import { Product } from './screens/Product';
 import { Products } from './screens/Products';
 import { RawMaterials } from './screens/RawMaterials';
 import { Review } from './screens/Review';
+import { SubstanceDetail } from './screens/SubstanceDetail';
 import { SubstanceLibrary } from './screens/SubstanceLibrary';
 import { SdsList } from './screens/SdsList';
 
@@ -81,6 +82,7 @@ export function App() {
 
   const reviewId = route.match(/^\/hammaddeler\/([0-9a-f-]{36})$/)?.[1];
   const productId = route.match(/^\/urunler\/([0-9a-f-]{36})$/)?.[1];
+  const substanceCas = route.match(/^\/kutuphane\/(\d{2,7}-\d{2}-\d)$/)?.[1];
   const section = route.startsWith('/urunler')
     ? 'urunler'
     : route.startsWith('/kutuphane')
@@ -162,6 +164,13 @@ export function App() {
           <KduList userId={session.user.id} />
         ) : section === 'yonetim' && platformAdmin ? (
           <Admin />
+        ) : section === 'kutuphane' && substanceCas ? (
+          <SubstanceDetail
+            cas={substanceCas}
+            membership={membership}
+            userId={session.user.id}
+            platformAdmin={platformAdmin}
+          />
         ) : section === 'kutuphane' ? (
           <SubstanceLibrary />
         ) : section === 'sds' ? (
@@ -176,7 +185,11 @@ export function App() {
             onBack={() => navigate('/hammaddeler')}
           />
         ) : (
-          <RawMaterials membership={membership} onOpen={(id) => navigate(`/hammaddeler/${id}`)} />
+          <RawMaterials
+            membership={membership}
+            userId={session.user.id}
+            onOpen={(id) => navigate(`/hammaddeler/${id}`)}
+          />
         )}
       </main>
     </div>

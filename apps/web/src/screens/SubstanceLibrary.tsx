@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { isValidCas } from '../lib/cas';
+import { fetchOutside } from '../lib/outside';
 import { supabase } from '../lib/supabase';
 
 interface Substance {
@@ -18,6 +20,9 @@ export function SubstanceLibrary() {
   const [rows, setRows] = useState<Substance[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A CAS number that is not in the library yet is looked up at PubChem and added.
+  const [fetching, setFetching] = useState<string | null>(null);
+  const [fetched, setFetched] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -46,13 +51,24 @@ export function SubstanceLibrary() {
         setRows([]);
       } else {
         setError(null);
-        setRows((data ?? []) as Substance[]);
+        const found = (data ?? []) as Substance[];
+        setRows(found);
+        const cas = query.trim();
+        if (found.length === 0 && isValidCas(cas) && !fetched.includes(cas)) {
+          setFetching(cas);
+          void fetchOutside(cas).then((r) => {
+            if (!active) return;
+            setFetching(null);
+            setFetched((f) => [...f, cas]);
+            if (r.error) setError(`PubChem'e ulaşılamadı: ${r.error}`);
+          });
+        }
       }
     });
     return () => {
       active = false;
     };
-  }, [query, shown, total]);
+  }, [query, shown, total, fetched]);
 
   return (
     <section className="grid gap-3">
@@ -70,7 +86,7 @@ export function SubstanceLibrary() {
           setQuery(e.target.value);
           setShown(PAGE);
         }}
-        placeholder="Ad, CAS, EC veya liste no ile ara"
+        placeholder="Ad, CAS, EC veya liste no ile ara (yeni CAS otomatik eklenir)"
         className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
       />
       {error && (
@@ -91,9 +107,17 @@ export function SubstanceLibrary() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.list_no ?? r.name} className="border-t border-slate-100">
+              <tr key={r.list_no ?? r.name} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="px-3 py-2 font-mono text-xs">{r.list_no ?? '—'}</td>
-                <td className="px-3 py-2">{r.name}</td>
+                <td className="px-3 py-2">
+                  {r.cas_number ? (
+                    <a href={`#/kutuphane/${r.cas_number}`} className="text-sky-800 underline">
+                      {r.name}
+                    </a>
+                  ) : (
+                    r.name
+                  )}
+                </td>
                 <td className="px-3 py-2">{r.synonyms[0] ?? '—'}</td>
                 <td className="px-3 py-2 font-mono text-xs">{r.ec_number ?? '—'}</td>
                 <td className="px-3 py-2 font-mono text-xs">{r.cas_number ?? '—'}</td>
@@ -102,7 +126,11 @@ export function SubstanceLibrary() {
           </tbody>
         </table>
         {rows.length === 0 && !error && (
-          <p className="px-3 py-4 text-sm text-slate-500">Eşleşen madde yok.</p>
+          <p className="px-3 py-4 text-sm text-slate-500">
+            {fetching
+              ? `${fetching} kütüphanede yok; PubChem'de aranıyor ve kaydediliyor…`
+              : 'Eşleşen madde yok. CAS numarası yazarsan PubChem’de aranır ve kütüphaneye eklenir.'}
+          </p>
         )}
       </div>
       {rows.length === shown && (

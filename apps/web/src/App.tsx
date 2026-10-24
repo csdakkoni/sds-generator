@@ -11,6 +11,7 @@ import { Product } from './screens/Product';
 import { Products } from './screens/Products';
 import { RawMaterials } from './screens/RawMaterials';
 import { Review } from './screens/Review';
+import { SubstanceLibrary } from './screens/SubstanceLibrary';
 import { SdsList } from './screens/SdsList';
 
 /** Routes live in the hash so the static host needs no server rewrites. */
@@ -82,13 +83,15 @@ export function App() {
   const productId = route.match(/^\/urunler\/([0-9a-f-]{36})$/)?.[1];
   const section = route.startsWith('/urunler')
     ? 'urunler'
-    : route.startsWith('/sds')
-      ? 'sds'
-      : route.startsWith('/yonetim')
-        ? 'yonetim'
-        : route.startsWith('/kdu')
-          ? 'kdu'
-          : 'hammaddeler';
+    : route.startsWith('/kutuphane')
+      ? 'kutuphane'
+      : route.startsWith('/sds')
+        ? 'sds'
+        : route.startsWith('/yonetim')
+          ? 'yonetim'
+          : route.startsWith('/kdu')
+            ? 'kdu'
+            : 'hammaddeler';
   const showKdu = platformAdmin || hasRole(membership, 'kdu');
   const tab = (active: boolean) =>
     `rounded-md px-3 py-1.5 ${active ? 'bg-sky-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`;
@@ -115,6 +118,9 @@ export function App() {
             </a>
             <a href="#/urunler" className={tab(section === 'urunler')}>
               Ürünler
+            </a>
+            <a href="#/kutuphane" className={tab(section === 'kutuphane')}>
+              Kütüphane
             </a>
             <a href="#/sds" className={tab(section === 'sds')}>
               SDS'ler
@@ -156,6 +162,8 @@ export function App() {
           <KduList userId={session.user.id} />
         ) : section === 'yonetim' && platformAdmin ? (
           <Admin />
+        ) : section === 'kutuphane' ? (
+          <SubstanceLibrary />
         ) : section === 'sds' ? (
           <SdsList membership={membership} onOpen={(id) => navigate(`/urunler/${id}`)} />
         ) : section === 'urunler' ? (

@@ -183,6 +183,7 @@ interface Collected {
   notes: EngineWarning[];
   cas: Record<string, string | null>;
   ec: Record<string, string | null>;
+  names: Record<string, string>;
   sources: Record<string, string>;
 }
 
@@ -220,6 +221,7 @@ function addManual(
     if (official) fromEk6 += 1;
     const id = `${line.id}:${i}`;
     out.cas[id] = c.cas_number;
+    out.names[id] = c.name_as_written;
     out.ec[id] = null;
     out.components.push({
       id,
@@ -256,6 +258,8 @@ export function buildMixture(
   notes: EngineWarning[];
   cas: Record<string, string | null>;
   ec: Record<string, string | null>;
+  /** Substance name per engine component id for printing; never a trade name. */
+  names: Record<string, string>;
   /** One-word source label per recipe line (UX principle 6). */
   sources: Record<string, string>;
 } {
@@ -265,6 +269,7 @@ export function buildMixture(
   const cas: Record<string, string | null> = {};
   /** EC number per engine component id, for section 3 of the SDS. */
   const ec: Record<string, string | null> = {};
+  const names: Record<string, string> = {};
   const sources: Record<string, string> = {};
 
   for (const line of lines) {
@@ -280,6 +285,7 @@ export function buildMixture(
         notes,
         cas,
         ec,
+        names,
         sources,
       });
       continue;
@@ -294,6 +300,7 @@ export function buildMixture(
           `${name}: KDU onaylı tedarikçi SDS'i yok, verisi kullanılmadı.`,
         ),
       );
+      names[line.id] = 'Bileşimi bilinmeyen madde';
       components.push({
         id: line.id,
         name,
@@ -309,6 +316,15 @@ export function buildMixture(
       sources[line.id] = 'Tedarikçi SDS (onaylı)';
       const pc = extraction.productClassification;
       const classifications = mapLines(pc.lines, name, notes);
+      // The SDS names no substance, and the printed SDS must not carry a trade name.
+      names[line.id] = 'Madde adı belirtilmemiş';
+      notes.push(
+        warn(
+          'review',
+          'RECIPE_SUBSTANCE_NAME_MISSING',
+          `${name}: tedarikçi SDS'inde bileşim yok, bu yüzden madde adı ve CAS numarası bilinmiyor. SDS'e ticari ad basılmaz; madde adı ve CAS CAS ile hammadde olarak girilmeli.`,
+        ),
+      );
       components.push({
         id: line.id,
         name,
@@ -356,6 +372,7 @@ export function buildMixture(
       }
       const official = c.cas.value ? harmonised[c.cas.value] : undefined;
       if (official) fromEk6 += 1;
+      names[`${line.id}:${i}`] = c.name.value ?? `${i + 1}. bileşen`;
       cas[`${line.id}:${i}`] = c.cas.value;
       ec[`${line.id}:${i}`] = c.ec?.value ?? null;
       components.push({
@@ -404,6 +421,7 @@ export function buildMixture(
     notes,
     cas,
     ec,
+    names,
     sources,
   };
 }

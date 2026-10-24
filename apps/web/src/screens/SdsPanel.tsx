@@ -102,6 +102,7 @@ export function SdsPanel({
     notes: EngineWarning[];
     cas: Record<string, string | null>;
     ec: Record<string, string | null>;
+    names?: Record<string, string>;
   };
   result: ClassificationResult;
   measurements: SdsContent['measurements'];

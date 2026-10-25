@@ -1,7 +1,6 @@
 /** Reading and writing outside-source data; the pure summary lives in outside-summary.ts. */
 import { hazardClassOf } from '@sds/classification-engine';
 import {
-  agreementLabel,
   summarise,
   type ConfirmedProfile,
   type OutsideRecord,
@@ -162,30 +161,4 @@ export async function confirmOutside(args: {
     .eq('substance_id', args.substanceId)
     .eq('status', 'open');
   return null;
-}
-
-/** Puts a substance on the firm's KDU list once, unless an open item already exists. */
-export async function ensureReviewItem(args: {
-  organizationId: string;
-  substanceId: string;
-  cas: string;
-  name: string;
-  summary: OutsideSummary | undefined;
-}): Promise<void> {
-  const { data: open } = await supabase
-    .from('kdu_review_queue')
-    .select('id')
-    .eq('organization_id', args.organizationId)
-    .eq('substance_id', args.substanceId)
-    .eq('status', 'open')
-    .limit(1);
-  if (open && open.length > 0) return;
-  const conflict = args.summary?.agreement.status === 'conflict';
-  await supabase.from('kdu_review_queue').insert({
-    organization_id: args.organizationId,
-    item_type: conflict ? 'profile_conflict' : 'profile_draft',
-    title: `${args.name} (${args.cas}): ${agreementLabel(args.summary)}`,
-    substance_id: args.substanceId,
-    detail: { url: `#/kutuphane/${args.cas}`, cas: args.cas },
-  });
 }

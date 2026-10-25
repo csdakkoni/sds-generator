@@ -155,7 +155,7 @@ describe('buildMixture', () => {
       snapshot: null,
     });
 
-    it('drafts with the most severe line of the sources and blocks finalising', () => {
+    it('never drafts from outside sources: asks for the supplier SDS and shows them as info', () => {
       const summaries = {
         '1-1-1': summarise('1-1-1', [
           record('nite', 'jp_nite', ['H319']),
@@ -163,13 +163,32 @@ describe('buildMixture', () => {
         ]),
       };
       const m = buildMixture(recipe, [material], [], {}, { summaries });
-      expect(m.input.components[0]?.classifications).toEqual([
-        { category: 'Eye Dam. 1', hCode: 'H318' },
-      ]);
-      expect(m.sources.l1).toBe('dış kaynak, onay bekliyor (1), SDS yok');
-      expect(m.notes.some((n) => n.code === 'RECIPE_OUTSIDE_UNCONFIRMED')).toBe(true);
+      expect(m.input.components[0]?.classifications).toEqual([]);
+      expect(m.input.components[0]?.hazardData).toBe('unknown');
+      expect(m.sources.l1).toBe('dış kaynak, yalnızca bilgi (1), SDS yok');
+      const note = m.notes.find((n) => n.code === 'RECIPE_SUPPLIER_SDS_NEEDED');
+      expect(note?.severity).toBe('blocking');
+      expect(note?.message).toContain('nite: H319');
+      expect(note?.message).toContain('nz: H318');
       const result = classifyMixture(m.input);
-      expect(result.classifications.some((c) => c.category === 'Eye Dam. 1')).toBe(true);
+      expect(result.classifications.some((c) => c.hazardClass === 'eye_damage_irritation')).toBe(
+        false,
+      );
+      // Missing data is not "no hazard" (CLAUDE.md rule 5).
+      expect(result.classStatus.eye_damage_irritation).toBe('undetermined');
+      expect(result.canFinalize).toBe(false);
+    });
+
+    it('sources that say "not classified" do not make the component not classified', () => {
+      const summaries = {
+        '1-1-1': summarise('1-1-1', [
+          { ...record('nite', 'jp_nite', []), not_classified: true },
+          { ...record('nz', 'nz_epa', []), not_classified: true },
+        ]),
+      };
+      const m = buildMixture(recipe, [material], [], {}, { summaries });
+      expect(m.input.components[0]?.hazardData).toBe('unknown');
+      expect(classifyMixture(m.input).canFinalize).toBe(false);
     });
 
     it('uses the KDU-confirmed profile without a blocking note', () => {
@@ -183,7 +202,7 @@ describe('buildMixture', () => {
       };
       const m = buildMixture(recipe, [material], [], {}, { confirmed });
       expect(m.input.components[0]?.hazardData).toBe('classified');
-      expect(m.sources.l1).toBe('KDU onaylı dış kaynak (1), SDS yok');
+      expect(m.sources.l1).toBe('KDU değerlendirmesi (1), SDS yok');
       expect(m.notes.some((n) => n.severity === 'blocking')).toBe(false);
     });
 

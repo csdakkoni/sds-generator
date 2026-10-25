@@ -62,7 +62,7 @@ const lineText = (l: { category: string; hCode: string }) => `${l.category} (${l
 
 /**
  * One substance: identity, SEA Annex 6, what each outside source says and how far independent
- * sources agree, and the firm KDU's confirmation. A substance not yet in the library is looked
+ * sources agree (information only), and the firm KDU's expert assessment. A substance not yet in the library is looked
  * up automatically.
  */
 export function SubstanceDetail({
@@ -230,7 +230,8 @@ export function SubstanceDetail({
           </>
         ) : (
           <p className="text-sm text-slate-600">
-            Ek-6'da yok. Sınıflandırma dış kaynaklardan ve KDU onayından gelir.
+            Ek-6'da yok. Sınıflandırma hammaddenin tedarikçi SDS'inden gelir; aşağıdaki dış
+            kaynaklar yalnızca bilgi ve kontrol içindir.
           </p>
         )}
       </Card>
@@ -345,10 +346,10 @@ export function SubstanceDetail({
         </button>
       </Card>
 
-      <Card title="Firmanın KDU onayı">
+      <Card title="KDU uzman değerlendirmesi">
         {confirmed ? (
           <p className="text-sm">
-            Onaylı:{' '}
+            Kayıtlı:{' '}
             {confirmed.lines.length > 0 ? confirmed.lines.map(lineText).join(', ') : 'ek sınıf yok'}{' '}
             <small className="text-slate-500">
               ({new Date(confirmed.verifiedAt).toLocaleDateString('tr-TR')})
@@ -356,7 +357,8 @@ export function SubstanceDetail({
           </p>
         ) : (
           <p className="text-sm text-slate-600">
-            Henüz onay yok. Onaylanana kadar bu maddeyi kullanan SDS'ler taslak kalır.
+            Kayıt yok. Bu maddeyi tedarikçi SDS'i olmadan, yalnızca CAS ile kullanan SDS'ler taslak
+            kalır. Tedarikçi SDS'i alınamıyorsa KDU kendi değerlendirmesini burada kaydedebilir.
           </p>
         )}
         {isKdu && substance ? (
@@ -380,7 +382,9 @@ export function SubstanceDetail({
             }}
           />
         ) : (
-          !isKdu && <p className="text-xs text-slate-500">Onayı firmanın KDU'su verir.</p>
+          !isKdu && (
+            <p className="text-xs text-slate-500">Değerlendirmeyi firmanın KDU'su kaydeder.</p>
+          )
         )}
       </Card>
     </div>
@@ -434,7 +438,8 @@ function ConfirmForm({
 
   const [choice, setChoice] = useState(options[0]?.key ?? 'none');
   const [lines, setLines] = useState<Line[]>(options[0]?.lines ?? []);
-  const [open, setOpen] = useState(!hasConfirmed);
+  // Closed at first: the supplier SDS is the source; this is the KDU's deliberate exception.
+  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   if (!open) {
@@ -444,7 +449,7 @@ function ConfirmForm({
         onClick={() => setOpen(true)}
         className="justify-self-start text-xs font-semibold text-sky-800 underline"
       >
-        Yeniden değerlendir
+        {hasConfirmed ? 'Yeniden değerlendir' : 'Uzman değerlendirmesi kaydet'}
       </button>
     );
   }
@@ -516,7 +521,7 @@ function ConfirmForm({
           ? 'Önce belirsiz kategorileri seç'
           : saving
             ? 'Kaydediliyor…'
-            : 'Onayla'}
+            : 'Değerlendirmeyi kaydet'}
       </button>
     </div>
   );

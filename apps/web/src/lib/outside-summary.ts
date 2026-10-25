@@ -43,7 +43,10 @@ export interface OutsideSummary {
   cas: string;
   sources: OutsideSource[];
   agreement: Agreement;
-  /** What a draft calculates with until the KDU confirms: the most severe line per class. */
+  /**
+   * The most severe line per class: a starting point for the KDU's own expert assessment.
+   * Never used in a draft; the classification comes from the supplier SDS (decision 2026-10-25).
+   */
   draftLines: SourceLine[];
 }
 
@@ -86,16 +89,16 @@ export function summarise(cas: string, records: OutsideRecord[]): OutsideSummary
   };
 }
 
-/** Plain-Turkish state of a substance's outside sources, for labels and the KDU. */
+/** Plain-Turkish state of a substance's outside sources; they are information only. */
 export function agreementLabel(summary: OutsideSummary | undefined): string {
   if (!summary || summary.sources.length === 0) return 'Dış kaynakta veri yok';
   switch (summary.agreement.status) {
     case 'agreed':
-      return `${summary.agreement.families} bağımsız kaynak uyumlu, KDU onayı bekliyor`;
+      return `Dış kaynaklar: ${summary.agreement.families} bağımsız kaynak uyumlu (yalnızca bilgi)`;
     case 'conflict':
-      return 'Kaynaklar farklı ya da kategori belirsiz: KDU karar verecek';
+      return 'Dış kaynaklar birbirinden farklı (yalnızca bilgi)';
     case 'single_family':
-      return 'Tek bağımsız kaynak var: KDU kontrol edecek';
+      return 'Dış kaynaklar: tek bağımsız kaynak (yalnızca bilgi)';
     default:
       return 'Dış kaynakta veri yok';
   }

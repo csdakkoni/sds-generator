@@ -50,7 +50,9 @@ export async function lookupCas(cas: string, organizationId: string): Promise<Ca
         ? 'SEA Ek-6: doğrulanmış.'
         : `SEA Ek-6: var, henüz doğrulanmadı${entry.caveat ? ` (${entry.caveat})` : ''}.`
       : "SEA Ek-6'da yok.",
-    own ? 'Dış kaynak sınıflandırması KDU onaylı.' : `${agreementLabel(summary ?? undefined)}.`,
+    own
+      ? 'KDU değerlendirmesi kayıtlı.'
+      : `${agreementLabel(summary ?? undefined)}. Sınıflandırma için tedarikçi SDS'i gerekir.`,
   ];
   if (fetched.error) parts.push(`PubChem'e ulaşılamadı (${fetched.error}).`);
   return {
@@ -61,14 +63,4 @@ export async function lookupCas(cas: string, organizationId: string): Promise<Ca
     confirmed: own,
     message: parts.join(' '),
   };
-}
-
-/**
- * What a substance still needs from a KDU: nothing (confirmed), one click (independent sources
- * agree; UX principle 5 keeps such records off the KDU list), or a place on the KDU list
- * (sources differ, only one source, or no data beyond Annex 6).
- */
-export function kduState(info: CasInfo): 'done' | 'one_click' | 'list' {
-  if (info.confirmed) return 'done';
-  return info.summary?.agreement.status === 'agreed' ? 'one_click' : 'list';
 }

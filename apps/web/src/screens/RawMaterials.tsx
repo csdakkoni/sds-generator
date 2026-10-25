@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { canEdit, hasRole, materialState, nameFromFile, type MaterialState } from '../lib/review';
 import { isValidCas } from '../lib/cas';
-import { kduState, lookupCas, type CasInfo } from '../lib/cas-lookup';
-import { confirmOutside, ensureReviewItem } from '../lib/outside';
+import { lookupCas, type CasInfo } from '../lib/cas-lookup';
 import { supabase } from '../lib/supabase';
 import type { Membership, RawMaterial } from '../lib/types';
 import { Alert, Badge, Card, EmptyState, Icon, PageHeader, type Tone } from '../ui';
@@ -28,11 +27,9 @@ function StatePill({ state }: { state: MaterialState }) {
 
 export function RawMaterials({
   membership,
-  userId,
   onOpen,
 }: {
   membership: Membership;
-  userId: string;
   onOpen: (rawMaterialId: string) => void;
 }) {
   const [items, setItems] = useState<RawMaterial[] | null>(null);
@@ -136,13 +133,7 @@ export function RawMaterials({
         </label>
       )}
       {editable && (
-        <CasForm
-          organizationId={membership.organization_id}
-          userId={userId}
-          isKdu={hasRole(membership, 'kdu')}
-          onDone={reload}
-          onError={setError}
-        />
+        <CasForm organizationId={membership.organization_id} onDone={reload} onError={setError} />
       )}
       {error && <Alert>{error}</Alert>}
       <Card title={`Hammaddelerin${items ? ` (${items.length})` : ''}`} padded={false}>
@@ -261,14 +252,10 @@ const toNumber = (s: string) => Number(s.replace(',', '.').trim());
 /** Adds a raw material from known CAS numbers, for when no supplier SDS is at hand. */
 function CasForm({
   organizationId,
-  userId,
-  isKdu,
   onDone,
   onError,
 }: {
   organizationId: string;
-  userId: string;
-  isKdu: boolean;
   onDone: () => void;
   onError: (message: string | null) => void;
 }) {
@@ -294,22 +281,6 @@ function CasForm({
           : r,
       ),
     );
-  }
-
-  /** One click for a KDU when independent sources agree (UX principle 5). */
-  async function confirm(i: number, info: CasInfo) {
-    if (!info.summary || !info.substanceId) return;
-    onError(null);
-    const failed = await confirmOutside({
-      organizationId,
-      userId,
-      substanceId: info.substanceId,
-      summary: info.summary,
-      lines: info.summary.draftLines.map((l) => ({ category: l.category, hCode: l.hCode })),
-      choice: 'kaynaklar uyumlu, önerilen sınıflandırma kabul edildi',
-    });
-    if (failed) onError(failed);
-    else await lookUp(i, rows[i]?.cas ?? '');
   }
 
   async function save() {
@@ -369,19 +340,6 @@ function CasForm({
       onError(`Bileşenler kaydedilemedi (${compError.message}).`);
       return;
     }
-    await Promise.all(
-      infos.map((info, i) =>
-        info.substanceId && kduState(info) === 'list'
-          ? ensureReviewItem({
-              organizationId,
-              substanceId: info.substanceId,
-              cas: rows[i]?.cas.trim() ?? '',
-              name: info.name ?? rows[i]?.name.trim() ?? '',
-              summary: info.summary ?? undefined,
-            })
-          : Promise.resolve(),
-      ),
-    );
     setSaving(false);
     setOpen(false);
     setTradeName('');
@@ -406,9 +364,10 @@ function CasForm({
     <section className="grid gap-3 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
       <h2 className="text-sm font-semibold text-slate-800">CAS numarasıyla hammadde</h2>
       <p className="text-sm text-slate-500">
-        CAS numarasını yaz: ad ve dış kaynak kayıtları otomatik bulunur. Sınıflandırma SEA Ek-6'dan
-        gelir; Ek-6'da olmayan maddeler için dış kaynaklar taslakta kullanılır ve KDU onayına kadar
-        SDS taslak kalır. Hiç veri yoksa "veri yok" uyarısı çıkar. Oranı bilmiyorsan boş bırak.
+        CAS numarasını yaz: ad, EC numarası ve dış kaynak bilgileri otomatik bulunur. SEA Ek-6'daki
+        sınıflar doğrudan kullanılır. Diğer sınıflar için tedarikçi SDS'i gerekir; dış kaynaklar
+        yalnızca bilgi olarak gösterilir ve SDS o zamana kadar taslak kalır. Oranı bilmiyorsan boş
+        bırak.
       </p>
       <label className="grid gap-1 text-sm">
         Hammadde adı
@@ -469,15 +428,6 @@ function CasForm({
                   <a href={`#/kutuphane/${r.cas.trim()}`} className="text-sky-800 underline">
                     Madde sayfası
                   </a>
-                  {isKdu && kduState(r.info) === 'one_click' && (
-                    <button
-                      type="button"
-                      onClick={() => r.info && r.info !== 'searching' && void confirm(i, r.info)}
-                      className="ml-2 font-semibold text-emerald-800 underline"
-                    >
-                      Onayla
-                    </button>
-                  )}
                 </>
               )}
             </small>

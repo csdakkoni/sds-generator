@@ -256,8 +256,8 @@ export function SubstanceDetail({
                       `motorda değerlendirilmeyen: ${s.notEvaluated.join(', ')}`,
                     s.notInClp.length > 0 && `SEA'da karşılığı yok: ${s.notInClp.join(', ')}`,
                     s.unreadable.length > 0 && `okunamayan: ${s.unreadable.join(' | ')}`,
-                    s.superseded.length > 0 &&
-                      `daha eski rapor kullanılmadı: ${s.superseded.join(', ')}`,
+                    s.reports.length > 0 &&
+                      `${s.reports.length} rapor, her sınıfta en yenisi geçerli: ${s.reports.join(', ')}`,
                   ].filter(Boolean);
                   return (
                     <tr key={s.record.source_id} className="border-t border-slate-100 align-top">

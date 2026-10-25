@@ -4,7 +4,9 @@
  * single molecules:
  *  1. name search on the number (works for ordinary substances);
  *  2. the registry-number cross-reference (an exact match PubChem itself made);
- *  3. depositor "substance" records carrying the number, and the compounds they map to.
+ *  3. depositor "substance" records carrying the number: a name and EC number only. The compounds
+ *     such records map to are NOT used (they include components and parents, e.g. the sulfuric
+ *     acid of a sulfate salt), so no hazard data is ever attached through this route.
  * Identity only, like identity.ts: nothing here reads hazard data.
  */
 import { parseIdentity, type SubstanceIdentity } from './identity.ts';
@@ -24,6 +26,8 @@ export interface Resolution {
   cids: number[];
   /** Name taken from depositor records when no compound exists; null when none looks safe. */
   substanceName: string | null;
+  /** EC number found in depositor records ("EC 500-241-6"), when no compound exists. */
+  substanceEc: string | null;
   /** What each step found, for the function log. */
   steps: string[];
   /** Steps PubChem failed to answer (not "no match"); the answer is then incomplete. */
@@ -56,6 +60,8 @@ export function inventoryName(synonyms: string[]): string | null {
 }
 
 const unique = (xs: number[]) => [...new Set(xs)];
+// Depositors write the EC number as "EC 500-241-6".
+const EC_LISTED = /^EC\s+(\d{3}-\d{3}-\d)$/;
 
 export async function resolveCas(cas: string, fetcher: Fetcher): Promise<Resolution> {
   const steps: string[] = [];
@@ -92,6 +98,7 @@ export async function resolveCas(cas: string, fetcher: Fetcher): Promise<Resolut
         identity,
         cids: [identity.cid, ...others].slice(0, MAX_CIDS),
         substanceName: null,
+        substanceEc: null,
         steps,
         errors,
       };
@@ -102,34 +109,26 @@ export async function resolveCas(cas: string, fetcher: Fetcher): Promise<Resolut
   const xref = (await get(`${PUG}/compound/xref/RegistryID/${key}/cids/JSON`)) as {
     IdentifierList?: { CID?: number[] };
   } | null;
-  let cids = unique(xref?.IdentifierList?.CID ?? []);
+  const cids = unique(xref?.IdentifierList?.CID ?? []);
   steps.push(`registry cross-reference: ${cids.length} compounds`);
 
-  // 3. depositor substance records
-  let substanceName: string | null = null;
+  // 3. depositor substance records (name and EC only)
   if (cids.length === 0) {
     const subs = (await get(`${PUG}/substance/name/${key}/synonyms/JSON`)) as Synonyms | null;
     const withCas = (subs?.InformationList?.Information ?? []).filter((i) =>
       i.Synonym?.includes(cas),
     );
     steps.push(`substance records: ${withCas.length}`);
-    if (withCas.length > 0) {
-      substanceName = inventoryName(withCas.flatMap((i) => i.Synonym ?? []));
-      const sids = withCas
-        .map((i) => i.SID)
-        .filter((s): s is number => !!s)
-        .slice(0, MAX_LOOKUP);
-      const mapped = sids.length
-        ? ((await get(`${PUG}/substance/sid/${sids.join(',')}/cids/JSON?cids_type=all`)) as {
-            InformationList?: { Information?: { CID?: number[] }[] };
-          } | null)
-        : null;
-      cids = unique((mapped?.InformationList?.Information ?? []).flatMap((i) => i.CID ?? []));
-      steps.push(`compounds of those substances: ${cids.length}`);
-    }
+    const listed = withCas.flatMap((i) => i.Synonym ?? []);
+    return {
+      identity: null,
+      cids: [],
+      substanceName: inventoryName(listed),
+      substanceEc: listed.map((x) => EC_LISTED.exec(x)?.[1]).find(Boolean) ?? null,
+      steps,
+      errors,
+    };
   }
-
-  if (cids.length === 0) return { identity: null, cids: [], substanceName, steps, errors };
 
   const pick = cids.slice(0, MAX_LOOKUP);
   const synonyms = (await get(
@@ -144,5 +143,12 @@ export async function resolveCas(cas: string, fetcher: Fetcher): Promise<Resolut
   const identity = found && inventory ? { ...found, name: inventory } : found;
   steps.push(`identity: ${identity ? `CID ${identity.cid}` : 'none'}`);
   const first = identity ? [identity.cid, ...pick.filter((c) => c !== identity.cid)] : pick;
-  return { identity, cids: first.slice(0, MAX_CIDS), substanceName, steps, errors };
+  return {
+    identity,
+    cids: first.slice(0, MAX_CIDS),
+    substanceName: null,
+    substanceEc: null,
+    steps,
+    errors,
+  };
 }

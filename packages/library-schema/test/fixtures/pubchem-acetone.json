@@ -1,0 +1,249 @@
+{
+  "_note": "Acetone (CAS 67-64-1), as PubChem PUG-View returned it on 2026-10-24 (heading GHS Classification and Hazard Classes and Categories), reduced to the fields the parser reads: markup and source descriptions omitted.",
+  "Record": {
+    "Section": [
+      {
+        "TOCHeading": "GHS Classification",
+        "Information": [
+          {
+            "ReferenceNumber": 94,
+            "Name": "GHS Hazard Statements",
+            "Value": {
+              "StringWithMarkup": [
+                {
+                  "String": "H225: Highly Flammable liquid and vapor [Danger Flammable liquids]"
+                },
+                {
+                  "String": "H319: Causes serious eye irritation [Warning Serious eye damage/eye irritation]"
+                },
+                {
+                  "String": "H336: May cause drowsiness or dizziness [Warning Specific target organ toxicity, single exposure; Narcotic effects]"
+                }
+              ]
+            }
+          },
+          {
+            "ReferenceNumber": 95,
+            "Name": "GHS Hazard Statements",
+            "Value": {
+              "StringWithMarkup": [
+                {
+                  "String": "H225: Highly Flammable liquid and vapor [Danger Flammable liquids]"
+                },
+                {
+                  "String": "H319: Causes serious eye irritation [Warning Serious eye damage/eye irritation]"
+                },
+                {
+                  "String": "H336: May cause drowsiness or dizziness [Warning Specific target organ toxicity, single exposure; Narcotic effects]"
+                }
+              ]
+            }
+          },
+          {
+            "ReferenceNumber": 157,
+            "Name": "GHS Hazard Statements",
+            "Value": {
+              "StringWithMarkup": [
+                {
+                  "String": "H225: Highly Flammable liquid and vapor [Danger Flammable liquids]"
+                },
+                {
+                  "String": "H320: Causes eye irritation [Warning Serious eye damage/eye irritation]"
+                },
+                {
+                  "String": "H335: May cause respiratory irritation [Warning Specific target organ toxicity, single exposure; Respiratory tract irritation]"
+                },
+                {
+                  "String": "H336: May cause drowsiness or dizziness [Warning Specific target organ toxicity, single exposure; Narcotic effects]"
+                },
+                {
+                  "String": "H361: Suspected of damaging fertility or the unborn child [Warning Reproductive toxicity]"
+                },
+                {
+                  "String": "H372: Causes damage to organs through prolonged or repeated exposure [Danger Specific target organ toxicity, repeated exposure]"
+                }
+              ]
+            }
+          },
+          {
+            "ReferenceNumber": 156,
+            "Name": "GHS Hazard Statements",
+            "Value": {
+              "StringWithMarkup": [
+                {
+                  "String": "H225: Highly Flammable liquid and vapor [Danger Flammable liquids]"
+                },
+                {
+                  "String": "H305: May be harmful if swallowed and enters airways [Warning Aspiration hazard]"
+                },
+                {
+                  "String": "H320: Causes eye irritation [Warning Serious eye damage/eye irritation]"
+                },
+                {
+                  "String": "H335: May cause respiratory irritation [Warning Specific target organ toxicity, single exposure; Respiratory tract irritation]"
+                },
+                {
+                  "String": "H336: May cause drowsiness or dizziness [Warning Specific target organ toxicity, single exposure; Narcotic effects]"
+                },
+                {
+                  "String": "H361: Suspected of damaging fertility or the unborn child [Warning Reproductive toxicity]"
+                },
+                {
+                  "String": "H373: May causes damage to organs through prolonged or repeated exposure [Warning Specific target organ toxicity, repeated exposure]"
+                }
+              ]
+            }
+          },
+          {
+            "ReferenceNumber": 175,
+            "Name": "GHS Hazard Statements",
+            "Value": {
+              "StringWithMarkup": [
+                {
+                  "String": "H225: Highly Flammable liquid and vapor [Danger Flammable liquids]"
+                },
+                {
+                  "String": "H319: Causes serious eye irritation [Warning Serious eye damage/eye irritation]"
+                },
+                {
+                  "String": "H336: May cause drowsiness or dizziness [Warning Specific target organ toxicity, single exposure; Narcotic effects]"
+                }
+              ]
+            }
+          }
+        ],
+        "Section": [
+          {
+            "TOCHeading": "Hazard Classes and Categories",
+            "Information": [
+              {
+                "ReferenceNumber": 94,
+                "Value": {
+                  "StringWithMarkup": [
+                    {
+                      "String": "Flammable liquid - category 2"
+                    },
+                    {
+                      "String": "Eye irritation - category 2A"
+                    },
+                    {
+                      "String": "Specific target organ toxicity (single exposure) - category 3"
+                    }
+                  ]
+                }
+              },
+              {
+                "ReferenceNumber": 157,
+                "Value": {
+                  "StringWithMarkup": [
+                    {
+                      "String": "Flammable liquids - Category 2"
+                    },
+                    {
+                      "String": "Serious eye damage/eye irritation - Category 2B"
+                    },
+                    {
+                      "String": "Reproductive toxicity - Category 2"
+                    },
+                    {
+                      "String": "Specific target organ toxicity - Single exposure - Category 3 (Respiratory tract irritation, Narcotic effects)"
+                    },
+                    {
+                      "String": "Specific target organ toxicity - Repeated exposure - Category 1 (central nervous system, respiratory system, gastrointestinal tract)"
+                    }
+                  ]
+                }
+              },
+              {
+                "ReferenceNumber": 156,
+                "Value": {
+                  "StringWithMarkup": [
+                    {
+                      "String": "Flammable liquids - Category 2"
+                    },
+                    {
+                      "String": "Serious eye damage/eye irritation - Category 2B"
+                    },
+                    {
+                      "String": "Reproductive toxicity - Category 2"
+                    },
+                    {
+                      "String": "Specific target organ toxicity - Single exposure - Category 3 (Respiratory tract irritation, Narcotic effects)"
+                    },
+                    {
+                      "String": "Specific target organ toxicity - Repeated exposure - Category 2 (blood)"
+                    },
+                    {
+                      "String": "Aspiration hazard - Category 2"
+                    }
+                  ]
+                }
+              },
+              {
+                "ReferenceNumber": 175,
+                "Value": {
+                  "StringWithMarkup": [
+                    {
+                      "String": "Flam. Liq. 2"
+                    },
+                    {
+                      "String": "STOT SE 3"
+                    },
+                    {
+                      "String": "Eye Irrit. 2"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "Reference": [
+      {
+        "ReferenceNumber": 94,
+        "SourceName": "Hazardous Chemical Information System (HCIS), Safe Work Australia",
+        "SourceID": "60",
+        "Name": "acetone",
+        "SortOrder": 10,
+        "URL": "https://hcis-old.safeworkaustralia.gov.au/HazardousChemical/Details?chemicalID=60"
+      },
+      {
+        "ReferenceNumber": 95,
+        "SourceName": "Hazardous Substances Data Bank (HSDB)",
+        "SourceID": "41",
+        "Name": "ACETONE",
+        "URL": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/41",
+        "LicenseURL": "https://www.nlm.nih.gov/web_policies.html"
+      },
+      {
+        "ReferenceNumber": 157,
+        "SourceName": "NITE-CMC",
+        "SourceID": "H26_B_006__",
+        "Name": "Acetone - FY2014 (Revised classification)",
+        "SortOrder": 2014,
+        "URL": "https://www.chem-info.nite.go.jp/chem/english/ghs/14-mhlw-2006e.html",
+        "LicenseURL": "https://www.chem-info.nite.go.jp/en/chem/chrip/chrip_search/html/condUse.html"
+      },
+      {
+        "ReferenceNumber": 156,
+        "SourceName": "NITE-CMC",
+        "SourceID": "635",
+        "Name": "Acetone - FY2006 (New/original classication)",
+        "SortOrder": 2006,
+        "URL": "https://www.chem-info.nite.go.jp/chem/english/ghs/06-imcg-0627e.html",
+        "LicenseURL": "https://www.chem-info.nite.go.jp/en/chem/chrip/chrip_search/html/condUse.html"
+      },
+      {
+        "ReferenceNumber": 175,
+        "SourceName": "Regulation (EC) No 1272/2008 of the European Parliament and of the Council",
+        "SourceID": "606-001-00-8",
+        "Name": "acetone; propan-2-one; propanone",
+        "SortOrder": 100000,
+        "URL": "https://eur-lex.europa.eu/eli/reg/2008/1272/oj",
+        "LicenseURL": "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html"
+      }
+    ]
+  }
+}

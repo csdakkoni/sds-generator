@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   EXCLUDED_FAMILIES,
@@ -92,5 +93,41 @@ describe('parseGhs', () => {
 
   it('excludes ECHA notification aggregates (decision 2026-10-19)', () => {
     expect(EXCLUDED_FAMILIES.has(familyOf('European Chemicals Agency (ECHA)'))).toBe(true);
+  });
+});
+
+describe('real PubChem data (acetone, 2026-10-24)', () => {
+  const acetone = JSON.parse(
+    readFileSync(new URL('./fixtures/pubchem-acetone.json', import.meta.url), 'utf8'),
+  ) as PugView;
+  const sources = parseGhs(acetone);
+  const by = (family: string) => sources.find((s) => s.family === family);
+  const codes = (family: string) => by(family)?.statements.map((s) => s.hCode);
+
+  it('groups the reports by source and reads each statement code', () => {
+    expect(sources.map((s) => s.family).sort()).toEqual([
+      'au_hcis',
+      'eu_clp_regulation',
+      'jp_nite',
+      'other:hazardous-substances-data-bank-hsdb',
+    ]);
+    expect(codes('au_hcis')).toEqual(['H225', 'H319', 'H336']);
+    expect(by('au_hcis')?.categoryTexts).toContain('Eye irritation - category 2A');
+    expect(by('other:hazardous-substances-data-bank-hsdb')?.categoryTexts).toEqual([]);
+  });
+
+  it('uses only the newest report of a source that published several', () => {
+    const nite = by('jp_nite');
+    expect(codes('jp_nite')).toEqual(['H225', 'H320', 'H335', 'H336', 'H361', 'H372']);
+    expect(nite?.categoryTexts.some((t) => t.includes('Category 2 (blood)'))).toBe(false);
+    expect(nite?.superseded).toEqual(['Acetone - FY2006 (New/original classication)']);
+  });
+
+  it('leaves out the copy of the EU CLP table and the ECHA aggregate', () => {
+    expect(EXCLUDED_FAMILIES.has('eu_clp_regulation')).toBe(true);
+    expect(EXCLUDED_FAMILIES.has('echa_notifications')).toBe(true);
+    expect(
+      familyOf('Regulation (EC) No 1272/2008 of the European Parliament and of the Council'),
+    ).toBe('eu_clp_regulation');
   });
 });

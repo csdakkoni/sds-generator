@@ -34,7 +34,7 @@ Aşağıdaki liste kaynakların rolünü özetler. Kaynak katmanları (source_ty
 3. **Karışıma ait ölçülmüş veriler** (parlama noktası, pH, yoğunluk vb.): laboratuvar sonucu olarak girilir.
 4. **PubChem**: kimlik eşleştirme (CAS, isim, EC) ve dış kaynak olarak, PubChem'in yeniden yayımladığı kaynak bazlı GHS kayıtları (Japonya NITE, Yeni Zelanda EPA vb.; ECHA C&L bildirimleri hariç). Tek başına kaynak değildir: bağımsız kaynaklar karşılaştırılır, taslakta kullanılır, KDU onayı olmadan SDS kesinleşmez (bkz. Açık kararlar, 2026-10-24).
 
-Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kısıtı var), IFA GESTIS (ticari aktarım yasak), C&L envanterindeki "çoğunluk bildirimi" (PubChem'in ECHA kayıtları dahil).
+Kullanılmayacak kaynaklar: ECHA'nın Ek VI Excel tablosu (ticari kullanım kısıtı var), IFA GESTIS (ticari aktarım yasak), C&L envanterindeki "çoğunluk bildirimi" (PubChem'in ECHA kayıtları dahil), PubChem'in "Regulation (EC) No 1272/2008" kaydı (AB CLP Ek VI tablosunun kopyası; harmonize kaynak SEA Ek-6'dır).
 
 ## Madde kütüphanesi ve kaynak katmanları
 

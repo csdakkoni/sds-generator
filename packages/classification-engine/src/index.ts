@@ -7,6 +7,7 @@
 export { hCodeOptions, isHazardCategory } from './categories';
 export { applyHarmonised } from './harmonised';
 export { classifyMixture } from './classify';
+export { labelIngredients, type LabelIngredient } from './label-ingredients';
 export { ENGINE_VERSION } from './version';
 export * from './types';
 export { compareSources } from './source-agreement';

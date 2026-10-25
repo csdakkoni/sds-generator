@@ -16,7 +16,8 @@ import { canEdit } from '../lib/review';
 import { supabase } from '../lib/supabase';
 import type { DataSource } from '../lib/sds/content';
 import type { Extraction, ManualComponent, Membership } from '../lib/types';
-import { ClassificationView } from './ClassificationView';
+import { Alert, Badge, PageHeader } from '../ui';
+import { ClassificationView, finalizable, LabelSummary } from './ClassificationView';
 import { SdsPanel } from './SdsPanel';
 
 interface MaterialRow {
@@ -58,10 +59,12 @@ function toRecipeMaterial(m: MaterialRow): RecipeMaterial {
   };
 }
 
+type Tab = 'recipe' | 'classification' | 'sds';
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</h2>
+    <section className="grid content-start gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
       {children}
     </section>
   );
@@ -71,14 +74,13 @@ export function Product({
   membership,
   userId,
   productId,
-  onBack,
 }: {
   membership: Membership;
   userId: string;
   productId: string;
-  onBack: () => void;
 }) {
   const [data, setData] = useState<Loaded | null>(null);
+  const [tab, setTab] = useState<Tab>('recipe');
   const [error, setError] = useState<string | null>(null);
   const editable = canEdit(membership);
   const org = membership.organization_id;
@@ -266,27 +268,71 @@ export function Product({
     );
   }
 
+  const blocking = computed
+    ? [...computed.notes, ...computed.result.warnings].filter((w) => w.severity === 'blocking')
+        .length
+    : 0;
+  const ready = computed ? finalizable(computed.result, computed.notes) : false;
   const totalMin = data.lines.reduce((s, l) => s + Number(l.percent_min), 0);
   const totalMax = data.lines.reduce((s, l) => s + Number(l.percent_max), 0);
   const recipeMaterials = data.materials.map(toRecipeMaterial);
 
   return (
-    <div className="grid gap-4">
-      <button type="button" onClick={onBack} className="justify-self-start text-sm text-sky-800">
-        ← Ürünler
-      </button>
-      <h1 className="text-2xl font-semibold text-slate-900">
-        {data.name}
-        {data.code && <span className="ml-2 text-base text-slate-500">{data.code}</span>}
-      </h1>
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+    <div className="grid gap-5">
+      <PageHeader
+        back={{ label: 'Ürünler', href: '#/urunler' }}
+        title={
+          <>
+            {data.name}
+            {data.code && (
+              <span className="ml-2 text-base font-normal text-slate-500">{data.code}</span>
+            )}
+          </>
+        }
+        actions={
+          computed &&
+          (ready ? (
+            <Badge tone="good">Kesinleşebilir</Badge>
+          ) : (
+            <Badge tone="bad">Taslak{blocking > 0 ? ` · ${blocking} eksik` : ''}</Badge>
+          ))
+        }
+      />
+      {error && <Alert>{error}</Alert>}
+
+      {computed && (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <LabelSummary result={computed.result} />
+        </section>
       )}
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="grid min-w-0 gap-4">
+      <div role="tablist" aria-label="Ürün" className="flex gap-1 border-b border-slate-200">
+        {(
+          [
+            ['recipe', `Reçete (${data.lines.length})`],
+            ['classification', 'Sınıflandırma ve gerekçe'],
+            ['sds', 'SDS ve etiket'],
+          ] as const
+        ).map(([key, text]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+              tab === key
+                ? 'border-sky-800 text-sky-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'recipe' && (
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <Card title="Reçete">
             {data.lines.length === 0 && (
               <p className="text-sm text-slate-500">Henüz reçete satırı yok.</p>
@@ -369,19 +415,26 @@ export function Product({
             />
           </Card>
         </div>
+      )}
 
-        <div className="min-w-0">
-          <Card title="Sınıflandırma sonucu">
-            {computed ? (
-              <ClassificationView result={computed.result} notes={computed.notes} />
-            ) : (
-              <p className="text-sm text-slate-500">Reçete girildiğinde burada hesaplanır.</p>
-            )}
-          </Card>
-        </div>
-      </div>
+      {tab === 'classification' && (
+        <Card title="Sınıflandırma sonucu">
+          {computed ? (
+            <ClassificationView result={computed.result} notes={computed.notes} summary={false} />
+          ) : (
+            <p className="text-sm text-slate-500">Reçete girildiğinde burada hesaplanır.</p>
+          )}
+        </Card>
+      )}
 
-      {computed && (
+      {tab === 'sds' && !computed && (
+        <Card title="Güvenlik bilgi formu (SDS)">
+          <p className="text-sm text-slate-500">
+            Önce reçeteyi gir; SDS taslağı reçeteden üretilir.
+          </p>
+        </Card>
+      )}
+      {tab === 'sds' && computed && (
         <Card title="Güvenlik bilgi formu (SDS)">
           <SdsPanel
             membership={membership}
@@ -433,7 +486,7 @@ function AddLine({
           <select
             value={materialId}
             onChange={(e) => setMaterialId(e.target.value)}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
           >
             <option value="">Seç…</option>
             {materials.map((m) => (
@@ -449,7 +502,7 @@ function AddLine({
             value={min}
             onChange={(e) => setMin(e.target.value)}
             inputMode="decimal"
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
           />
         </label>
         <label className="grid w-24 gap-1 text-xs text-slate-600">
@@ -459,7 +512,7 @@ function AddLine({
             onChange={(e) => setMax(e.target.value)}
             inputMode="decimal"
             placeholder="aralıksa"
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
           />
         </label>
         <button
@@ -550,13 +603,13 @@ function Measurements({
                   ['positive', 'Pozitif'],
                 ];
           return (
-            <label key={m.key} className="grid gap-1 text-xs text-slate-600">
+            <label key={m.key} className="grid min-w-0 gap-1 text-xs text-slate-600">
               {m.label}
               <select
                 disabled={!editable}
                 value={current(m.key)}
                 onChange={(e) => onSave(m.key, e.target.value, null)}
-                className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                className="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
               >
                 <option value="">Ölçülmedi</option>
                 {options.map(([value, text]) => (
@@ -569,7 +622,7 @@ function Measurements({
           );
         }
         return (
-          <label key={m.key} className="grid gap-1 text-xs text-slate-600">
+          <label key={m.key} className="grid min-w-0 gap-1 text-xs text-slate-600">
             {m.label}
             {m.unit ? ` (${m.unit})` : ''}
             <input
@@ -584,7 +637,7 @@ function Measurements({
                 const n = parseNumber(text);
                 onSave(m.key, text, text && Number.isFinite(n) ? n : null);
               }}
-              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              className="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
             />
           </label>
         );

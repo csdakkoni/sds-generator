@@ -47,7 +47,7 @@ function StepCard({ step, index }: { step: Step; index: number }) {
   const active = step.state === 'active';
   return (
     <li
-      className={`relative flex gap-4 rounded-xl border bg-white p-5 shadow-sm ${
+      className={`relative flex flex-wrap gap-4 rounded-xl border bg-white p-5 shadow-sm sm:flex-nowrap ${
         active ? 'border-sky-300 ring-2 ring-sky-100' : 'border-slate-200'
       }`}
     >
@@ -72,7 +72,7 @@ function StepCard({ step, index }: { step: Step; index: number }) {
         <p className="mt-1 text-sm text-slate-500">{s.text}</p>
         <p className="mt-3 text-sm font-medium text-slate-700">{step.summary}</p>
       </div>
-      <div className="self-center">
+      <div className="w-full pl-14 sm:w-auto sm:self-center sm:pl-0">
         <ButtonLink href={s.href} variant={active ? 'primary' : 'secondary'}>
           {s.action}
         </ButtonLink>

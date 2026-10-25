@@ -40,11 +40,90 @@ const PICTOGRAM_TR: Record<Pictogram, string> = {
   GHS09: 'Çevre',
 };
 
-const SEVERITY: Record<EngineWarning['severity'], { title: string; cls: string }> = {
-  blocking: { title: 'Tamamlanması gerekenler', cls: 'border-red-200 bg-red-50 text-red-800' },
-  review: { title: 'KDU kontrol etmeli', cls: 'border-amber-200 bg-amber-50 text-amber-900' },
-  info: { title: 'Bilgi', cls: 'border-sky-200 bg-sky-50 text-sky-900' },
+const SEVERITY: Record<EngineWarning['severity'], { title: string; cls: string; open: boolean }> = {
+  blocking: {
+    title: 'Tamamlanması gerekenler',
+    cls: 'border-red-200 bg-red-50 text-red-800',
+    open: true,
+  },
+  review: {
+    title: 'KDU kontrol etmeli',
+    cls: 'border-amber-200 bg-amber-50 text-amber-900',
+    open: true,
+  },
+  info: { title: 'Bilgi', cls: 'border-sky-200 bg-sky-50 text-sky-900', open: false },
 };
+
+const SIGNAL = { danger: 'TEHLİKE', warning: 'DİKKAT' } as const;
+
+/** Whether the result can be finalised once the recipe-level notes are counted in. */
+export function finalizable(result: ClassificationResult, notes: EngineWarning[]): boolean {
+  return result.canFinalize && !notes.some((n) => n.severity === 'blocking');
+}
+
+export function PictogramImage({ code, size = 'h-14 w-14' }: { code: Pictogram; size?: string }) {
+  return (
+    <img
+      src={`${import.meta.env.BASE_URL}ghs/${code}.png`}
+      alt={`${code} ${PICTOGRAM_TR[code]}`}
+      title={PICTOGRAM_TR[code]}
+      className={size}
+    />
+  );
+}
+
+export function HCode({ code }: { code: string }) {
+  return (
+    <span className="rounded-md bg-red-50 px-1.5 py-0.5 font-mono text-xs font-bold text-red-700 ring-1 ring-inset ring-red-200">
+      {code}
+    </span>
+  );
+}
+
+/** The label at a glance: signal word, pictograms and hazard statement codes. */
+export function LabelSummary({
+  result,
+  codes: showCodes = true,
+}: {
+  result: ClassificationResult;
+  /** Off where the codes are listed with their reasons right below. */
+  codes?: boolean;
+}) {
+  const { label } = result;
+  const codes = [...new Set(result.classifications.flatMap((c) => c.hCodes))];
+  return (
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div>
+        <p className="text-xs text-slate-500">Uyarı kelimesi</p>
+        <p
+          className={`text-2xl font-bold ${label.signalWord === 'danger' ? 'text-red-700' : 'text-slate-900'}`}
+        >
+          {label.signalWord ? SIGNAL[label.signalWord] : 'Yok'}
+        </p>
+      </div>
+      <ul className="flex flex-wrap gap-2" aria-label="Piktogramlar">
+        {label.pictograms.length === 0 && <li className="text-sm text-slate-500">Piktogram yok</li>}
+        {label.pictograms.map((p) => (
+          <li key={p}>
+            <PictogramImage code={p} />
+          </li>
+        ))}
+      </ul>
+      {showCodes && (
+        <div className="min-w-0">
+          <p className="text-xs text-slate-500">Tehlike ifadeleri</p>
+          <p className="mt-1 flex flex-wrap gap-1.5">
+            {codes.length === 0 ? (
+              <span className="text-sm text-slate-500">Yok</span>
+            ) : (
+              codes.map((h) => <HCode key={h} code={h} />)
+            )}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const fmt = (n: number | null) =>
   n === null ? '?' : new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(n);
@@ -52,54 +131,31 @@ const fmt = (n: number | null) =>
 export function ClassificationView({
   result,
   notes,
+  summary = true,
 }: {
   result: ClassificationResult;
   notes: EngineWarning[];
+  /** Off where the page already shows the label summary above. */
+  summary?: boolean;
 }) {
   const warnings = [...notes, ...result.warnings];
-  const canFinalize = result.canFinalize && !notes.some((n) => n.severity === 'blocking');
+  const canFinalize = finalizable(result, notes);
   const undetermined = (Object.keys(result.classStatus) as HazardClassId[]).filter(
     (c) => result.classStatus[c] === 'undetermined',
   );
   const { label } = result;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5">
       <p
-        className={`rounded-md px-3 py-2 text-sm font-semibold ${canFinalize ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}
+        className={`rounded-lg px-3 py-2 text-sm font-semibold ${canFinalize ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}
       >
         {canFinalize
           ? 'Sınıflandırma tamamlanabilir. KDU kontrol edip SDS adımına geçebilir.'
           : 'Sınıflandırma henüz kesinleşemez: aşağıdaki eksikler tamamlanmalı.'}
       </p>
 
-      <div className="flex flex-wrap items-center gap-6">
-        <div>
-          <p className="text-xs text-slate-500">Uyarı kelimesi</p>
-          <p
-            className={`text-2xl font-bold ${label.signalWord === 'danger' ? 'text-red-700' : 'text-slate-900'}`}
-          >
-            {label.signalWord === 'danger'
-              ? 'TEHLİKE'
-              : label.signalWord === 'warning'
-                ? 'DİKKAT'
-                : 'Yok'}
-          </p>
-        </div>
-        <ul className="flex flex-wrap gap-4" aria-label="Piktogramlar">
-          {label.pictograms.length === 0 && (
-            <li className="text-sm text-slate-500">Piktogram yok</li>
-          )}
-          {label.pictograms.map((p) => (
-            <li key={p} className="grid justify-items-center gap-2">
-              <span className="grid h-14 w-14 rotate-45 place-items-center border-4 border-red-600 bg-white">
-                <span className="-rotate-45 text-xs font-bold">{p}</span>
-              </span>
-              <span className="text-xs text-slate-600">{PICTOGRAM_TR[p]}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {summary && <LabelSummary result={result} codes={false} />}
 
       <section className="grid gap-2">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -110,15 +166,10 @@ export function ClassificationView({
         )}
         <ul className="grid gap-2">
           {result.classifications.map((c) => (
-            <li key={c.hazardClass} className="rounded-md border border-slate-200 p-3">
+            <li key={c.hazardClass} className="rounded-lg border border-slate-200 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 {c.hCodes.map((h) => (
-                  <span
-                    key={h}
-                    className="rounded border-2 border-red-700 bg-red-50 px-1.5 py-0.5 font-mono text-xs font-bold text-red-700"
-                  >
-                    {h}
-                  </span>
+                  <HCode key={h} code={h} />
                 ))}
                 <b className="text-sm">{c.category}</b>
                 <span className="text-sm text-slate-500">{HAZARD_CLASS_TR[c.hazardClass]}</span>
@@ -182,16 +233,20 @@ export function ClassificationView({
         const list = warnings.filter((w) => w.severity === sev);
         if (list.length === 0) return null;
         return (
-          <section key={sev} className={`grid gap-1 rounded-md border p-3 ${SEVERITY[sev].cls}`}>
-            <h3 className="text-sm font-bold">
+          <details
+            key={sev}
+            open={SEVERITY[sev].open}
+            className={`group rounded-lg border p-3 ${SEVERITY[sev].cls}`}
+          >
+            <summary className="cursor-pointer text-sm font-bold">
               {SEVERITY[sev].title} ({list.length})
-            </h3>
-            <ul className="grid list-disc gap-1 pl-5 text-sm">
+            </summary>
+            <ul className="mt-2 grid list-disc gap-1 pl-5 text-sm">
               {list.map((w, i) => (
                 <li key={i}>{w.message}</li>
               ))}
             </ul>
-          </section>
+          </details>
         );
       })}
 

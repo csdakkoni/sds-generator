@@ -206,12 +206,7 @@ export function App() {
       </aside>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 lg:px-8 lg:py-8">
         {productId ? (
-          <Product
-            membership={membership}
-            userId={session.user.id}
-            productId={productId}
-            onBack={() => navigate('/urunler')}
-          />
+          <Product membership={membership} userId={session.user.id} productId={productId} />
         ) : section === 'kdu' && showKdu ? (
           <KduList userId={session.user.id} />
         ) : section === 'yonetim' && platformAdmin ? (

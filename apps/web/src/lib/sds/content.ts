@@ -3,7 +3,12 @@
  * English documents are rendered from it, and two revisions are compared on it to decide
  * whether a new revision number is due (CLAUDE.md rule 10).
  */
-import type { ClassificationResult, EngineWarning, MixtureInput } from '@sds/classification-engine';
+import {
+  applyHarmonised,
+  type ClassificationResult,
+  type EngineWarning,
+  type MixtureInput,
+} from '@sds/classification-engine';
 import phrases from './phrases.json';
 
 export type SdsLanguage = 'tr' | 'en';
@@ -248,7 +253,8 @@ export function composeContent(args: {
       cas: args.mixture.cas[c.id] ?? null,
       min: c.concentration.min,
       max: c.concentration.max,
-      classifications: c.classifications,
+      // With the SEA Annex 6 floor applied, as the engine classified the mixture with it.
+      classifications: applyHarmonised(c).component.classifications,
     })),
     result: args.result,
     notes: args.mixture.notes,

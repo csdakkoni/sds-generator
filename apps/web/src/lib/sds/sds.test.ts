@@ -13,6 +13,7 @@ import {
   type SdsLanguage,
   type SectionTextKey,
 } from './content';
+import { labelData } from './label';
 import { buildSections, defaultSectionText } from './text';
 
 const src = { page: 1, quote: 'x' };
@@ -180,5 +181,67 @@ describe('revisions', () => {
     expect(sameContent(a, b)).toBe(false);
     expect(changedSections(a, b)).toEqual([14]);
     expect(changedSections(a, content('Skin Irrit. 2', 'H315'))).toContain(2);
+  });
+});
+
+describe('Section 3 composition', () => {
+  it('shows the SEA Annex 6 classification where the supplier SDS is lighter', () => {
+    const mixture = buildMixture(
+      [{ id: 'l1', raw_material_id: 'a', percent_min: 20, percent_max: 20 }],
+      [{ id: 'a', trade_name: 'Etken', approvedExtraction: extraction('Eye Irrit. 2', 'H319') }],
+      [],
+      {
+        '68439-49-6': {
+          reference: 'SEA Ek-6 000-000-00-0',
+          classifications: [{ category: 'Eye Dam. 1', hCode: 'H318' }],
+          verified: true,
+          caveat: null,
+          profileId: 'p',
+        },
+      },
+    );
+    const c = composeContent({
+      product: { name: 'Deneme', code: null },
+      company: { name: 'Firma', address: '', phone: '', email: '', emergencyPhone: '' },
+      inputs: emptyInputs(),
+      measurements: [],
+      mixture,
+      result: classifyMixture(mixture.input),
+      dataSources: [],
+    });
+    expect(c.composition[0]?.classifications).toEqual([{ category: 'Eye Dam. 1', hCode: 'H318' }]);
+  });
+});
+
+describe('GHS label', () => {
+  it('takes every hazard element from the engine and names the substance by its chemical name', () => {
+    const c = content('Eye Dam. 1', 'H318', 'Ticari Ad');
+    const tr = labelData(c, 'tr');
+    expect(tr.signalWord).toBe('TEHLİKE');
+    expect(tr.pictograms).toEqual(['GHS05']);
+    expect(tr.hazard).toEqual(['H318: Ciddi göz hasarına yol açar.']);
+    expect(tr.contains).toEqual(['Alkil eter']);
+    expect(JSON.stringify(tr)).not.toContain('Ticari Ad');
+    expect(tr.supplier).toEqual(['Firma', 'Adres', '1']);
+    expect(tr.emergency).toBe('2');
+    expect(labelData(c, 'en').signalWord).toBe('DANGER');
+  });
+
+  it('names no substance when the mixture is only an irritant', () => {
+    const c = content('Eye Irrit. 2', 'H319');
+    const tr = labelData(c, 'tr');
+    expect(tr.signalWord).toBe('DİKKAT');
+    expect(tr.contains).toEqual([]);
+  });
+
+  it('does not call a product with missing data "not classified"', () => {
+    const c = content('Eye Dam. 1', 'H318');
+    const missing = {
+      ...c,
+      result: { ...c.result, classifications: [], canFinalize: false },
+      notes: [],
+    };
+    expect(labelData(missing, 'tr').complete).toBe(false);
+    expect(labelData(c, 'tr').complete).toBe(c.result.canFinalize);
   });
 });

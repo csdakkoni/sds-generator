@@ -445,6 +445,35 @@ export function SdsPanel({
     }
   }
 
+  async function downloadLabel(l: SdsLanguage) {
+    if (!content) return;
+    setBusy(true);
+    try {
+      const [{ pdf }, { registerFonts }, { LabelPdf }, { labelData }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('../lib/sds/SdsPdf'),
+        import('../lib/sds/LabelPdf'),
+        import('../lib/sds/label'),
+      ]);
+      const base = new URL(import.meta.env.BASE_URL, window.location.origin).href;
+      registerFonts(base);
+      // The label follows the content on screen; it is marked draft unless that content is the
+      // approved revision.
+      const approved = savedSame && !!latest?.approved_by;
+      const blob = await pdf(
+        <LabelPdf data={labelData(content, l)} lang={l} draft={!approved} assetBase={base} />,
+      ).toBlob();
+      saveBlob(blob, `${documentNumber}-etiket-${l.toUpperCase()}${approved ? '' : '-taslak'}.pdf`);
+    } catch (e) {
+      setMessage({
+        tone: 'error',
+        text: `Etiket oluşturulamadı: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function downloadPdf(l: SdsLanguage, revision: RevisionRow | null) {
     setBusy(true);
     try {
@@ -757,6 +786,22 @@ export function SdsPanel({
           className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50"
         >
           Taslak PDF (EN)
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void downloadLabel('tr')}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          Etiket (TR)
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void downloadLabel('en')}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          Etiket (EN)
         </button>
         {isKdu && (
           <button

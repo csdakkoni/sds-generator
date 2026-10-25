@@ -73,7 +73,8 @@ describe('resolveCas', () => {
         ),
       }),
     );
-    expect(r.identity?.name).toBe('Isotridecanol, ethoxylated');
+    // The inventory-style synonym is preferred over a depositor's title.
+    expect(r.identity?.name).toBe('Alcohols, C13-iso-, ethoxylated');
     expect(r.identity?.ecNumber).toBe('500-241-6');
     expect(r.cids).toEqual([111, 222]);
   });

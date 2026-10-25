@@ -136,7 +136,12 @@ export async function resolveCas(cas: string, fetcher: Fetcher): Promise<Resolut
     `${PUG}/compound/cid/${pick.join(',')}/synonyms/JSON`,
   )) as Synonyms | null;
   const properties = (await get(props(pick))) ?? {};
-  const identity = synonyms ? parseIdentity(cas, synonyms, properties as never, true) : null;
+  const found = synonyms ? parseIdentity(cas, synonyms, properties as never, true) : null;
+  // Depositor-filed records often carry a trade name as their title; the inventory-style name
+  // among the synonyms, when there is one, is what the library should show.
+  const listed = synonyms?.InformationList?.Information?.find((i) => i.CID === found?.cid);
+  const inventory = inventoryName(listed?.Synonym ?? []);
+  const identity = found && inventory ? { ...found, name: inventory } : found;
   steps.push(`identity: ${identity ? `CID ${identity.cid}` : 'none'}`);
   const first = identity ? [identity.cid, ...pick.filter((c) => c !== identity.cid)] : pick;
   return { identity, cids: first.slice(0, MAX_CIDS), substanceName, steps, errors };

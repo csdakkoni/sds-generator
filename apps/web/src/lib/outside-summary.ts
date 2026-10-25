@@ -21,7 +21,7 @@ export interface OutsideRecord {
   category_texts: string[];
   not_classified: boolean;
   fetched_at: string;
-  snapshot: { unreadable?: string[] } | null;
+  snapshot: { unreadable?: string[]; superseded?: string[] } | null;
 }
 
 export interface OutsideSource {
@@ -30,6 +30,8 @@ export interface OutsideSource {
   notInClp: string[];
   notEvaluated: string[];
   unreadable: string[];
+  /** Older reports of the same source that were not used (the newest one is). */
+  superseded: string[];
 }
 
 export interface OutsideSummary {
@@ -54,7 +56,12 @@ export function summarise(cas: string, records: OutsideRecord[]): OutsideSummary
       record.lines.map((l) => l.hCode),
       record.category_texts,
     );
-    return { record, ...r, unreadable: record.snapshot?.unreadable ?? [] };
+    return {
+      record,
+      ...r,
+      unreadable: record.snapshot?.unreadable ?? [],
+      superseded: record.snapshot?.superseded ?? [],
+    };
   });
   const classifications: SourceClassification[] = sources.map((s) => ({
     sourceId: s.record.source_id,

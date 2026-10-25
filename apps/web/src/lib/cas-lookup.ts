@@ -38,7 +38,11 @@ export async function lookupCas(cas: string, organizationId: string): Promise<Ca
   const summary = outside[cas] ?? null;
   const own = confirmed[cas] ?? null;
   const parts = [
-    name ? `${name}.` : 'Ad bulunamadı, elle yaz.',
+    name
+      ? `${name}.`
+      : fetched.reason === 'no_record'
+        ? "PubChem'de bu CAS için kayıt yok (polimer, etoksilat gibi bileşimi değişken maddelerde olağandır); adı elle yaz, sınıflandırma için tedarikçi SDS'i yükle."
+        : 'Ad bulunamadı, elle yaz.',
     entry
       ? entry.verified
         ? 'SEA Ek-6: doğrulanmış.'

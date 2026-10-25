@@ -87,13 +87,13 @@ export async function loadConfirmed(
 export async function fetchOutside(
   cas: string,
   refresh = false,
-): Promise<{ found: boolean; name: string | null; error?: string }> {
+): Promise<{ found: boolean; name: string | null; reason?: string; error?: string }> {
   const { data, error } = await supabase.functions.invoke('lookup-cas', {
     body: { cas, refresh },
   });
   if (error) return { found: false, name: null, error: error.message };
-  const r = data as { found?: boolean; name?: string | null };
-  return { found: !!r.found, name: r.name ?? null };
+  const r = data as { found?: boolean; name?: string | null; reason?: string };
+  return { found: !!r.found, name: r.name ?? null, ...(r.reason ? { reason: r.reason } : {}) };
 }
 
 /**

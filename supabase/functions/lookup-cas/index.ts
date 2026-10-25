@@ -89,7 +89,13 @@ Deno.serve(async (req) => {
         )
       : null;
     const identity = synonyms ? parseIdentity(number, synonyms, properties ?? {}) : null;
-    if (!identity && !known) return json({ found: false });
+    if (!identity && !known) {
+      // 'no_record': PubChem has no compound under this CAS (typical for polymers, ethoxylates and
+      // other mixtures of variable composition); 'not_listed': it matched something else.
+      const reason = synonyms ? 'not_listed' : 'no_record';
+      console.log(`lookup-cas ${number}: not found (${reason})`);
+      return json({ found: false, reason });
+    }
 
     let substanceId = known?.id as string | undefined;
     if (!substanceId && identity) {
@@ -144,7 +150,12 @@ Deno.serve(async (req) => {
             category_texts: s.categoryTexts,
             not_classified: s.notClassified,
             data_license: registry?.data_license ?? 'unverified',
-            snapshot: { cid: identity.cid, unreadable: s.unreadable, ...s.snapshot },
+            snapshot: {
+              cid: identity.cid,
+              unreadable: s.unreadable,
+              superseded: s.superseded,
+              ...s.snapshot,
+            },
             fetched_at: new Date().toISOString(),
           },
           { onConflict: 'cas_number,source_id' },

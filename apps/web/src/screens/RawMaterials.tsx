@@ -416,9 +416,9 @@ function CasForm({
         CAS numarasıyla hammadde
       </h2>
       <p className="text-sm text-slate-500">
-        Sınıflandırma yalnızca KDU onaylı SEA Ek-6 listesinden gelir. Listede olmayan veya
-        listelenmeyen sınıflar için "veri yok" uyarısı çıkar ve SDS taslak kalır. Oranı bilmiyorsan
-        boş bırak.
+        CAS numarasını yaz: ad ve dış kaynak kayıtları otomatik bulunur. Sınıflandırma SEA Ek-6'dan
+        gelir; Ek-6'da olmayan maddeler için dış kaynaklar taslakta kullanılır ve KDU onayına kadar
+        SDS taslak kalır. Hiç veri yoksa "veri yok" uyarısı çıkar. Oranı bilmiyorsan boş bırak.
       </p>
       <label className="grid gap-1 text-sm">
         Hammadde adı

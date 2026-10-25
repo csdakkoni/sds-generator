@@ -27,6 +27,8 @@ interface Reference {
   SourceName?: string;
   SourceID?: string;
   Name?: string;
+  /** Order PubChem lists a source's reports in; for NITE-CMC the fiscal year of the report. */
+  SortOrder?: number;
   URL?: string;
   LicenseNote?: string;
   LicenseURL?: string;
@@ -47,6 +49,8 @@ export interface SourceGhs {
   notClassified: boolean;
   /** Items that could not be read as a statement; shown to the KDU, never guessed. */
   unreadable: string[];
+  /** Older reports of the same source that were left out in favour of the newest one. */
+  superseded: string[];
   snapshot: { references: Reference[]; items: Information[] };
 }
 
@@ -57,6 +61,7 @@ export interface SourceGhs {
  */
 const FAMILIES: [RegExp, string][] = [
   [/european chemicals agency|\bECHA\b/i, 'echa_notifications'],
+  [/regulation \(ec\) no 1272\/2008|\beur-?lex\b/i, 'eu_clp_regulation'],
   [/\bNITE\b|national institute of technology and evaluation/i, 'jp_nite'],
   [/new zealand|\bCCID\b/i, 'nz_epa'],
   [/korea/i, 'kr_me'],
@@ -66,8 +71,11 @@ const FAMILIES: [RegExp, string][] = [
 /**
  * Sources left out entirely. ECHA C&L "majority notification" data is never shown or stored
  * (CLAUDE.md, decision 2026-10-19), and PubChem's ECHA records are exactly that aggregate.
+ * PubChem's "Regulation (EC) No 1272/2008" record is a copy of the EU's CLP Annex VI table
+ * (its SourceID is the Annex VI index number); CLAUDE.md keeps third-party copies of regulation
+ * tables out of the product database, and the SEA Ek-6 import is the harmonised source here.
  */
-export const EXCLUDED_FAMILIES = new Set(['echa_notifications']);
+export const EXCLUDED_FAMILIES = new Set(['echa_notifications', 'eu_clp_regulation']);
 
 const slug = (s: string) =>
   s
@@ -97,6 +105,16 @@ function sections(root: Section[] | undefined, heading: string, out: Section[] =
 const strings = (i: Information) =>
   (i.Value?.StringWithMarkup ?? []).map((m) => m.String?.trim() ?? '').filter(Boolean);
 
+/** What one reference (one report of one source) says. */
+interface Report {
+  ref: Reference;
+  statements: { hCode: string; text: string }[];
+  categoryTexts: string[];
+  notClassified: boolean;
+  unreadable: string[];
+  items: Information[];
+}
+
 export function parseGhs(ghs: PugView, categories: PugView = {}): SourceGhs[] {
   const references = new Map<number, Reference>();
   for (const r of [...(ghs.Record?.Reference ?? []), ...(categories.Record?.Reference ?? [])]) {
@@ -110,59 +128,92 @@ export function parseGhs(ghs: PugView, categories: PugView = {}): SourceGhs[] {
     ...sections(categories.Record?.Section, 'Hazard Classes and Categories'),
   ].flatMap((s) => s.Information ?? []);
 
-  const bySource = new Map<string, SourceGhs>();
-  const entry = (n: number | undefined): SourceGhs | null => {
+  const reports = new Map<number, Report>();
+  const report = (n: number | undefined): Report | null => {
     const ref = n === undefined ? undefined : references.get(n);
-    const name = ref?.SourceName?.trim();
-    if (!ref || !name) return null;
-    const sourceId = `pubchem:${slug(name)}`;
-    let e = bySource.get(sourceId);
-    if (!e) {
-      e = {
-        sourceId,
-        sourceName: name,
-        family: familyOf(name),
-        url: ref.URL ?? null,
-        licenseNote: ref.LicenseNote ?? null,
-        licenseUrl: ref.LicenseURL ?? null,
+    if (!ref?.SourceName?.trim()) return null;
+    let r = reports.get(ref.ReferenceNumber ?? -1);
+    if (!r) {
+      r = {
+        ref,
         statements: [],
         categoryTexts: [],
         notClassified: false,
         unreadable: [],
-        snapshot: { references: [], items: [] },
+        items: [],
       };
-      bySource.set(sourceId, e);
+      reports.set(ref.ReferenceNumber ?? -1, r);
     }
-    if (!e.snapshot.references.includes(ref)) e.snapshot.references.push(ref);
-    return e;
+    return r;
   };
 
   for (const item of statementItems) {
     if (item.Name !== 'GHS Hazard Statements') continue;
-    const e = entry(item.ReferenceNumber);
-    if (!e) continue;
-    e.snapshot.items.push(item);
+    const r = report(item.ReferenceNumber);
+    if (!r) continue;
+    r.items.push(item);
     for (const text of strings(item)) {
       const code = LEADING_CODE.exec(text)?.[1];
       if (code) {
         const hCode = code.replace(/\s+/g, '');
-        if (!e.statements.some((s) => s.hCode === hCode)) e.statements.push({ hCode, text });
+        if (!r.statements.some((s) => s.hCode === hCode)) r.statements.push({ hCode, text });
       } else if (NOT_CLASSIFIED.test(text)) {
-        e.notClassified = true;
+        r.notClassified = true;
       } else if (!AGGREGATE_NOTE.test(text)) {
-        e.unreadable.push(text);
+        r.unreadable.push(text);
       }
     }
   }
   for (const item of categoryItems) {
-    const e = entry(item.ReferenceNumber);
-    if (!e) continue;
-    e.snapshot.items.push(item);
+    const r = report(item.ReferenceNumber);
+    if (!r) continue;
+    r.items.push(item);
     for (const text of strings(item))
-      if (!e.categoryTexts.includes(text)) e.categoryTexts.push(text);
+      if (!r.categoryTexts.includes(text)) r.categoryTexts.push(text);
   }
-  for (const e of bySource.values()) if (e.statements.length > 0) e.notClassified = false;
-  return [...bySource.values()].filter(
-    (e) => e.statements.length > 0 || e.notClassified || e.unreadable.length > 0,
-  );
+
+  // A source can publish several reports of one substance (NITE-CMC: the original 2006 and the
+  // revised 2014 classification). Only the newest is used; merging them would put a superseded
+  // category next to its replacement and show a conflict the source itself resolved.
+  const bySource = new Map<string, Report[]>();
+  for (const r of reports.values()) {
+    const id = `pubchem:${slug(r.ref.SourceName ?? '')}`;
+    bySource.set(id, [...(bySource.get(id) ?? []), r]);
+  }
+  const out: SourceGhs[] = [];
+  for (const [sourceId, all] of bySource) {
+    const newest = Math.max(...all.map((r) => r.ref.SortOrder ?? -Infinity));
+    const current = all.filter((r) => (r.ref.SortOrder ?? -Infinity) === newest);
+    const older = all.filter((r) => !current.includes(r));
+    const first = current[0]?.ref;
+    if (!first) continue;
+    const e: SourceGhs = {
+      sourceId,
+      sourceName: first.SourceName?.trim() ?? sourceId,
+      family: familyOf(first.SourceName ?? ''),
+      url: first.URL ?? null,
+      licenseNote: first.LicenseNote ?? null,
+      licenseUrl: first.LicenseURL ?? null,
+      statements: [],
+      categoryTexts: [],
+      notClassified: false,
+      unreadable: [],
+      superseded: older.map((r) => r.ref.Name ?? `rapor ${r.ref.SortOrder ?? '?'}`),
+      snapshot: { references: [], items: [] },
+    };
+    for (const r of all) {
+      e.snapshot.references.push(r.ref);
+      e.snapshot.items.push(...r.items);
+    }
+    for (const r of current) {
+      for (const st of r.statements)
+        if (!e.statements.some((x) => x.hCode === st.hCode)) e.statements.push(st);
+      for (const t of r.categoryTexts) if (!e.categoryTexts.includes(t)) e.categoryTexts.push(t);
+      e.notClassified = e.notClassified || r.notClassified;
+      e.unreadable.push(...r.unreadable);
+    }
+    if (e.statements.length > 0) e.notClassified = false;
+    if (e.statements.length > 0 || e.notClassified || e.unreadable.length > 0) out.push(e);
+  }
+  return out;
 }

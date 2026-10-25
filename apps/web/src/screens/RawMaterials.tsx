@@ -5,25 +5,24 @@ import { kduState, lookupCas, type CasInfo } from '../lib/cas-lookup';
 import { confirmOutside, ensureReviewItem } from '../lib/outside';
 import { supabase } from '../lib/supabase';
 import type { Membership, RawMaterial } from '../lib/types';
+import { Alert, Badge, Card, EmptyState, Icon, PageHeader, type Tone } from '../ui';
 
 const SELECT =
   'id, trade_name, supplier_name, raw_material_components (id, name_as_written, cas_number, concentration_min, concentration_max, sds_document_id), raw_material_sds_documents (id, status, extraction_status, flags, uploaded_at, revision_number, revision_date)';
 
 function StatePill({ state }: { state: MaterialState }) {
-  const map: Record<MaterialState['kind'], [string, string]> = {
-    no_document: ['SDS yok', 'bg-slate-100 text-slate-600'],
-    by_cas: ['CAS ile girildi', 'bg-violet-50 text-violet-800'],
-    reading: ['Okunuyor…', 'bg-sky-50 text-sky-800'],
-    failed: ['Okunamadı', 'bg-red-50 text-red-700'],
-    questions: ['', 'bg-amber-50 text-amber-800'],
-    ready: ['KDU onayı bekliyor', 'bg-amber-50 text-amber-800'],
-    approved: ['Onaylandı', 'bg-emerald-50 text-emerald-800'],
+  const map: Record<MaterialState['kind'], [string, Tone]> = {
+    no_document: ['SDS yok', 'neutral'],
+    by_cas: ['CAS ile girildi', 'violet'],
+    reading: ['Okunuyor…', 'info'],
+    failed: ['Okunamadı', 'bad'],
+    questions: ['', 'warn'],
+    ready: ['KDU onayı bekliyor', 'warn'],
+    approved: ['Onaylandı', 'good'],
   };
-  const [label, cls] = map[state.kind];
+  const [label, tone] = map[state.kind];
   return (
-    <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${cls}`}>
-      {state.kind === 'questions' ? `${state.open} soru bekliyor` : label}
-    </span>
+    <Badge tone={tone}>{state.kind === 'questions' ? `${state.open} soru bekliyor` : label}</Badge>
   );
 }
 
@@ -105,12 +104,10 @@ export function RawMaterials({
 
   return (
     <div className="grid gap-5">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Hammaddeler</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Tedarikçi SDS'lerini yükle. Sistem okur ve yalnızca emin olmadığı noktaları sorar.
-        </p>
-      </div>
+      <PageHeader
+        title="Hammaddeler"
+        description="Tedarikçi SDS'lerini yükle. Sistem okur ve yalnızca emin olmadığı noktaları sorar."
+      />
       {editable && (
         <label
           htmlFor="sds-files"
@@ -119,9 +116,15 @@ export function RawMaterials({
             e.preventDefault();
             void upload(e.dataTransfer.files);
           }}
-          className="cursor-pointer rounded-lg border-2 border-dashed border-slate-300 bg-white p-6 text-center text-slate-500 hover:border-sky-800 hover:text-slate-800"
+          className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-6 py-8 text-center text-slate-500 transition-colors hover:border-sky-700 hover:bg-sky-50/40 hover:text-slate-800"
         >
-          PDF dosyalarını buraya sürükle ya da <b>seçmek için tıkla</b>
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-50 text-sky-800">
+            <Icon name="upload" />
+          </span>
+          <span>
+            Tedarikçi SDS PDF'lerini buraya sürükle ya da <b className="text-sky-800">seç</b>
+          </span>
+          <span className="text-xs text-slate-400">Birden çok dosya seçebilirsin</span>
           <input
             id="sds-files"
             type="file"
@@ -141,31 +144,20 @@ export function RawMaterials({
           onError={setError}
         />
       )}
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
-      <section className="rounded-lg border border-slate-200 bg-white">
-        <h2 className="border-b border-slate-200 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">
-          Kütüphanen {items ? `(${items.length})` : ''}
-        </h2>
+      {error && <Alert>{error}</Alert>}
+      <Card title={`Hammaddelerin${items ? ` (${items.length})` : ''}`} padded={false}>
         {uploading.map((name) => (
           <div
             key={name}
-            className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3"
+            className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3"
           >
             <span className="truncate">{name}</span>
-            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">
-              Yükleniyor…
-            </span>
+            <Badge tone="info">Yükleniyor…</Badge>
           </div>
         ))}
         {items === null && <p className="px-4 py-6 text-sm text-slate-500">Yükleniyor…</p>}
         {items?.length === 0 && uploading.length === 0 && (
-          <p className="px-4 py-6 text-sm text-slate-500">
-            Henüz hammadde yok. İlk tedarikçi SDS'ini yukarıdan yükle.
-          </p>
+          <EmptyState title="Henüz hammadde yok">İlk tedarikçi SDS'ini yukarıdan yükle.</EmptyState>
         )}
         {items?.map((m) => {
           const doc = m.raw_material_sds_documents[0];
@@ -178,7 +170,7 @@ export function RawMaterials({
               <button
                 type="button"
                 onClick={() => onOpen(m.id)}
-                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
+                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-5 py-3 text-left"
               >
                 <span className="min-w-0">
                   <b className="block truncate">{m.trade_name}</b>
@@ -206,7 +198,7 @@ export function RawMaterials({
             </div>
           );
         })}
-      </section>
+      </Card>
     </div>
   );
 }

@@ -6,7 +6,7 @@ export function CreateOrganization({
   onCreated,
 }: {
   userId: string;
-  onCreated: () => void;
+  onCreated: (organizationId: string) => void;
 }) {
   const [name, setName] = useState('');
   const [isKdu, setIsKdu] = useState(true);
@@ -34,7 +34,7 @@ export function CreateOrganization({
       if (roleError) setError(`Firma oluştu ama KDU rolü eklenemedi: ${roleError.message}`);
     }
     setBusy(false);
-    onCreated();
+    onCreated(orgId as string);
   }
 
   return (

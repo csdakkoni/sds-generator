@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Membership } from '../lib/types';
+import { Alert, Badge, EmptyState, PageHeader } from '../ui';
 
 interface Row {
   id: string;
@@ -46,22 +47,17 @@ export function SdsList({
 
   return (
     <div className="grid gap-5">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">SDS'ler</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Ürün sayfasında oluşturulan güvenlik bilgi formları. Açmak için ürüne tıkla.
-        </p>
-      </div>
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      <PageHeader
+        title="SDS'ler"
+        description="Ürün sayfasında oluşturulan güvenlik bilgi formları. Açmak için ürüne tıkla."
+      />
+      {error && <Alert>{error}</Alert>}
       {items && items.length === 0 && (
-        <p className="text-sm text-slate-500">
-          Henüz SDS yok. Ürünler bölümünde bir ürünü aç, sınıflandırmanın altındaki "SDS taslağı
-          oluştur" düğmesini kullan.
-        </p>
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <EmptyState title="Henüz SDS yok">
+            Ürünler bölümünde bir ürünü aç ve "SDS taslağı oluştur" düğmesini kullan.
+          </EmptyState>
+        </div>
       )}
       {items && items.length > 0 && (
         <ul className="grid gap-2">
@@ -76,21 +72,19 @@ export function SdsList({
                 <button
                   type="button"
                   onClick={() => onOpen(d.product_id)}
-                  className="flex w-full flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-300"
+                  className="flex w-full flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-sky-300"
                 >
                   <span className="font-mono text-sm text-slate-600">{d.document_number}</span>
                   <span className="font-semibold">{d.products?.name}</span>
                   <span className="ml-auto flex flex-wrap gap-2 text-xs font-semibold">
                     {d.status === 'published' && approved?.approved_at && (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-800">
+                      <Badge tone="good">
                         Yayında · revizyon {approved.revision_number} ·{' '}
                         {trDate(approved.approved_at)}
-                      </span>
+                      </Badge>
                     )}
                     {latest && !latest.approved_at && (
-                      <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">
-                        Revizyon {latest.revision_number} taslak
-                      </span>
+                      <Badge tone="warn">Revizyon {latest.revision_number} taslak</Badge>
                     )}
                   </span>
                 </button>

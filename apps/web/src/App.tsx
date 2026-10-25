@@ -234,11 +234,7 @@ export function App() {
         ) : section === 'baslangic' ? (
           <Home membership={membership} />
         ) : (
-          <RawMaterials
-            membership={membership}
-            userId={session.user.id}
-            onOpen={(id) => navigate(`/hammaddeler/${id}`)}
-          />
+          <RawMaterials membership={membership} onOpen={(id) => navigate(`/hammaddeler/${id}`)} />
         )}
       </main>
     </div>

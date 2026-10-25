@@ -15,7 +15,7 @@ import {
   type SpecificConcentrationLimit,
 } from '@sds/classification-engine';
 import type { HarmonisedEntry } from './ek6';
-import { agreementLabel, type ConfirmedProfile, type OutsideSummary } from './outside-summary';
+import type { ConfirmedProfile, OutsideSummary } from './outside-summary';
 import type { ClassificationLine, Extraction, ManualComponent } from './types';
 
 export interface RecipeLine {
@@ -216,10 +216,11 @@ function harmonisedFor(
 }
 
 /**
- * A raw material entered by CAS number has no supplier classification. Its hazard data, in
- * order: the Annex 6 entry (always a floor), the firm KDU's confirmed outside-source profile,
- * or, until a KDU confirms, the outside sources' most severe lines as a draft that blocks
- * finalising. With none of these the component stays "unknown" (CLAUDE.md rule 5).
+ * A raw material entered by CAS number has no supplier classification. Its hazard data: the
+ * Annex 6 entry (always a floor) and the firm KDU's own expert assessment, if one was saved.
+ * Outside sources never fill the draft; what they report is shown so the firm knows which
+ * supplier SDS to ask for. Without a KDU assessment the component stays "unknown" for the
+ * classes Annex 6 does not list (CLAUDE.md rule 5).
  */
 function addManual(
   line: RecipeLine,
@@ -231,7 +232,7 @@ function addManual(
 ): void {
   const pMin = Number(line.percent_min);
   const pMax = Number(line.percent_max);
-  const counts = { ek6: 0, confirmed: 0, draft: 0, none: 0 };
+  const counts = { ek6: 0, confirmed: 0, info: 0, none: 0 };
   manual.forEach((c, i) => {
     const label = `${c.name_as_written} (${name})`;
     let cMin = c.concentration_min;
@@ -258,33 +259,29 @@ function addManual(
       counts.confirmed += 1;
       classifications = confirmed.lines;
       hazardData = classifications.length > 0 ? 'classified' : 'not_classified';
-    } else if (summary && summary.sources.length > 0) {
-      counts.draft += 1;
-      classifications = summary.draftLines.map((l) => ({ category: l.category, hCode: l.hCode }));
-      const allNotClassified = summary.sources.every((s) => s.record.not_classified);
-      hazardData =
-        classifications.length > 0 ? 'classified' : allNotClassified ? 'not_classified' : 'unknown';
-      const sourceNames = summary.sources.map((s) => s.record.name ?? s.record.source_id);
-      const uncertain = summary.draftLines.filter((l) => l.uncertain);
+    } else {
+      // Outside sources are for information only: the classification comes from the supplier
+      // SDS (decision 2026-10-25), so the component stays "unknown" here (CLAUDE.md rule 5).
+      const sources = summary?.sources ?? [];
+      if (sources.length > 0) counts.info += 1;
+      else if (!official) counts.none += 1;
+      const reported = sources
+        .filter((s) => s.lines.length > 0 || s.record.not_classified)
+        .map(
+          (s) =>
+            `${s.record.name ?? s.record.source_id}: ${
+              s.lines.length > 0
+                ? [...new Set(s.lines.map((l) => l.hCode))].join(', ')
+                : 'sınıflandırılmamış'
+            }`,
+        );
       out.notes.push(
         warn(
           'blocking',
-          'RECIPE_OUTSIDE_UNCONFIRMED',
-          `${label}: sınıflandırma onaylanmamış dış kaynaklardan (${sourceNames.join(', ')}) taslak olarak alındı; ${agreementLabel(summary)}.${uncertain.length > 0 ? ` Kategorisi kaynakta yazmayan: ${uncertain.map((l) => `${l.hCode} (en ağır varsayıldı: ${l.category})`).join(', ')}.` : ''} Kesinleştirmek için KDU Kütüphane'de onaylamalı.`,
+          'RECIPE_SUPPLIER_SDS_NEEDED',
+          `${label}: tedarikçi SDS'i yok; ${official ? "SEA Ek-6'nın listelemediği sınıflar" : 'sınıflandırma'} için tedarikçi SDS'i yüklenmeli.${reported.length > 0 ? ` Dış kaynakların bildirdiği (yalnızca bilgi, hesaba girmedi): ${reported.join(' · ')}.` : ''}`,
         ),
       );
-      const notEvaluated = [...new Set(summary.sources.flatMap((s) => s.notEvaluated))];
-      if (notEvaluated.length > 0) {
-        out.notes.push(
-          warn(
-            'review',
-            'RECIPE_OUTSIDE_NOT_EVALUATED',
-            `${label}: kaynaklar motorun değerlendirmediği sınıflar da bildiriyor (${notEvaluated.join(', ')}); karışımın fiziksel tehlikeleri ölçülmüş veriyle belirlenir, diğerlerini KDU değerlendirmeli.`,
-          ),
-        );
-      }
-    } else if (!official) {
-      counts.none += 1;
     }
     if (official) counts.ek6 += 1;
 
@@ -303,8 +300,8 @@ function addManual(
   });
   const parts = [
     counts.ek6 > 0 && `SEA Ek-6 (${counts.ek6})`,
-    counts.confirmed > 0 && `KDU onaylı dış kaynak (${counts.confirmed})`,
-    counts.draft > 0 && `dış kaynak, onay bekliyor (${counts.draft})`,
+    counts.confirmed > 0 && `KDU değerlendirmesi (${counts.confirmed})`,
+    counts.info > 0 && `dış kaynak, yalnızca bilgi (${counts.info})`,
     counts.none > 0 && `veri yok (${counts.none})`,
   ].filter(Boolean);
   out.sources[line.id] = `${parts.join(' + ')}, SDS yok`;
@@ -312,7 +309,7 @@ function addManual(
     warn(
       'info',
       'RECIPE_MATERIAL_BY_CAS',
-      `${name}: tedarikçi SDS'i yok, bileşenler CAS numarasıyla girildi. Sınıflandırma SEA Ek-6'dan ve dış kaynaklardan geliyor.`,
+      `${name}: tedarikçi SDS'i yok, bileşenler CAS numarasıyla girildi. Sınıflandırmada yalnızca SEA Ek-6 ve KDU değerlendirmesi kullanılır.`,
     ),
   );
 }

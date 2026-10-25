@@ -137,7 +137,9 @@ export function Admin() {
   return (
     <div className="grid gap-5">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Yönetim: SEA Ek-6 kütüphanesi</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          Yönetim: SEA Ek-6 kütüphanesi
+        </h1>
         <p className="mt-1 text-sm text-slate-500">
           Resmî Ek-6 tablosundaki maddeleri ortak kütüphaneye yükler. Önce kuru çalıştırma yap:
           hiçbir şey yazılmaz, yalnızca kaç kayıt ekleneceği ve kaçının güncelleneceği gösterilir.
@@ -182,7 +184,7 @@ export function Admin() {
             type="button"
             disabled={busy}
             onClick={() => void runImport()}
-            className="rounded-md bg-sky-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-sky-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             Onayla ve yaz
           </button>

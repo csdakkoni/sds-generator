@@ -517,7 +517,7 @@ function AddLine({
         </label>
         <button
           type="submit"
-          className="rounded-md bg-sky-900 px-3 py-1.5 text-sm font-semibold text-white"
+          className="rounded-lg bg-sky-900 px-3 py-1.5 text-sm font-semibold text-white"
         >
           Ekle
         </button>
@@ -561,7 +561,7 @@ function PasteLines({
         <button
           type="button"
           onClick={submit}
-          className="justify-self-start rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold"
+          className="justify-self-start rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold"
         >
           Satırları ekle
         </button>

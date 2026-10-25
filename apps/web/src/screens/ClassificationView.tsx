@@ -158,9 +158,7 @@ export function ClassificationView({
       {summary && <LabelSummary result={result} codes={false} />}
 
       <section className="grid gap-2">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          Sınıflandırma ve gerekçesi
-        </h3>
+        <h3 className="text-sm font-semibold text-slate-800">Sınıflandırma ve gerekçesi</h3>
         {result.classifications.length === 0 && (
           <p className="text-sm text-slate-500">Hesaplanan bir tehlike sınıfı yok.</p>
         )}
@@ -198,7 +196,7 @@ export function ClassificationView({
 
       {result.ate.some((a) => a.upper !== null) && (
         <section className="grid gap-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <h3 className="text-sm font-semibold text-slate-800">
             Karışımın akut toksisite tahmini (ATEmix)
           </h3>
           <ul className="text-sm">
@@ -219,9 +217,7 @@ export function ClassificationView({
 
       {undetermined.length > 0 && (
         <section className="grid gap-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Belirlenemeyen sınıflar
-          </h3>
+          <h3 className="text-sm font-semibold text-slate-800">Belirlenemeyen sınıflar</h3>
           <p className="text-sm text-slate-600">
             Veri eksik olduğu için bu sınıflar için "tehlike yok" denemiyor:{' '}
             {undetermined.map((c) => HAZARD_CLASS_TR[c]).join(', ')}.

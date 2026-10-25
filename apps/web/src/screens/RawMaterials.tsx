@@ -403,10 +403,8 @@ function CasForm({
 
   const input = 'rounded-md border border-slate-300 px-2 py-1 text-sm';
   return (
-    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-        CAS numarasıyla hammadde
-      </h2>
+    <section className="grid gap-3 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+      <h2 className="text-sm font-semibold text-slate-800">CAS numarasıyla hammadde</h2>
       <p className="text-sm text-slate-500">
         CAS numarasını yaz: ad ve dış kaynak kayıtları otomatik bulunur. Sınıflandırma SEA Ek-6'dan
         gelir; Ek-6'da olmayan maddeler için dış kaynaklar taslakta kullanılır ve KDU onayına kadar

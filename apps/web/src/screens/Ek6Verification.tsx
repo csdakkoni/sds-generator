@@ -74,7 +74,7 @@ export function Ek6Verification() {
           type="button"
           disabled={busy || counts.pending_simple === 0}
           onClick={() => void verify()}
-          className="rounded-md bg-sky-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="rounded-lg bg-sky-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           {counts.pending_simple} profili doğrula
         </button>

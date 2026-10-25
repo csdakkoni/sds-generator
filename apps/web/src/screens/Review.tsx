@@ -243,7 +243,7 @@ export function Review({
         ← Hammaddeler
       </button>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">{name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{name}</h1>
         {doc?.status === 'approved' && (
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
             Onaylandı
@@ -277,8 +277,8 @@ export function Review({
       )}
       {doc && (
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <section className="order-2 min-w-0 rounded-lg border border-slate-200 bg-white lg:sticky lg:top-4 lg:order-1">
-            <h2 className="border-b border-slate-200 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+          <section className="order-2 min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-4 lg:order-1">
+            <h2 className="border-b border-slate-200 px-4 py-2 text-sm font-semibold text-slate-800">
               Kaynak belge · sayfa {page}
             </h2>
             {pdfUrl ? (
@@ -294,125 +294,9 @@ export function Review({
           </section>
 
           <div className="order-1 grid min-w-0 gap-4 lg:order-2">
-            {x && (
-              <>
-                <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Belge
-                  </h2>
-                  <p className="text-sm">
-                    {x.identity.supplier.value ?? 'Tedarikçi belirtilmemiş'} · sürüm{' '}
-                    {x.identity.revisionNumber.value ?? '?'} ·{' '}
-                    {x.identity.revisionDate.value ?? '?'}
-                  </p>
-                </section>
-                <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Tedarikçinin verdiği sınıflandırma
-                  </h2>
-                  <ul className="flex flex-wrap gap-2">
-                    {x.productClassification.lines.length === 0 && (
-                      <li className="text-sm text-slate-500">Sınıflandırma satırı yok</li>
-                    )}
-                    {x.productClassification.lines.map((l, i) => (
-                      <HazardChip
-                        key={i}
-                        line={l}
-                        onShow={setPage}
-                        onPick={isKdu ? (code) => void setHCode(null, i, code) : null}
-                      />
-                    ))}
-                  </ul>
-                </section>
-                <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    İçindeki maddeler
-                  </h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                          <th className="py-1.5 pr-3">Madde</th>
-                          <th className="py-1.5 pr-3">Oran</th>
-                          <th className="py-1.5">Sınıflar</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {x.components.map((c, i) => (
-                          <tr key={i} className="border-b border-slate-100 align-top">
-                            <td className="py-2 pr-3">
-                              <b>{c.name.value ?? '?'}</b>
-                              <small className="block font-mono text-slate-500">
-                                CAS {c.cas.value ?? 'yok'}
-                              </small>
-                            </td>
-                            <td className="py-2 pr-3 font-mono whitespace-nowrap">
-                              {c.concentration?.raw ?? 'verilmemiş'}{' '}
-                              <PageLink page={c.concentration?.source.page} onShow={setPage} />
-                            </td>
-                            <td className="py-2 text-slate-600">
-                              {c.classifications.length === 0 && '—'}
-                              <ul className="grid gap-1">
-                                {c.classifications.map((l, j) => (
-                                  <li key={j} className="flex flex-wrap items-center gap-1.5">
-                                    <span>
-                                      {l.category ?? l.hazardClassAsWritten}
-                                      {l.hCode && (
-                                        <span className="ml-1 font-mono text-xs text-slate-500">
-                                          {l.hCode}
-                                          {l.hCodeChosenBy && ' (KDU seçti)'}
-                                        </span>
-                                      )}
-                                    </span>
-                                    <HCodePicker
-                                      line={l}
-                                      onPick={isKdu ? (code) => void setHCode(i, j, code) : null}
-                                    />
-                                  </li>
-                                ))}
-                              </ul>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-                <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Temel özellikler
-                  </h2>
-                  <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {PROPS.map(([key, label]) => {
-                      const p = x.physicalProperties.find((pp) => pp.property === key && pp.value);
-                      return (
-                        <div
-                          key={key}
-                          className="min-w-0 rounded-md border border-slate-200 px-3 py-2"
-                        >
-                          <dt className="text-xs text-slate-500">{label}</dt>
-                          <dd className="font-semibold break-words">
-                            {p ? (
-                              <>
-                                {p.value} <PageLink page={p.source.page} onShow={setPage} />
-                              </>
-                            ) : (
-                              <span className="font-normal text-amber-700 italic">belgede yok</span>
-                            )}
-                          </dd>
-                        </div>
-                      );
-                    })}
-                  </dl>
-                </section>
-              </>
-            )}
-
             {doc.extraction_status === 'done' && (
-              <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Sorular ({open} açık)
-                </h2>
+              <section className="grid gap-3 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+                <h2 className="text-sm font-semibold text-slate-800">Sorular ({open} açık)</h2>
                 {doc.flags.length === 0 && <p className="text-sm text-slate-500">Soru yok.</p>}
                 <ul className="grid gap-2">
                   {doc.flags.map((f, i) => {
@@ -467,14 +351,14 @@ export function Review({
                                 <button
                                   type="button"
                                   onClick={() => resolve(i, 'accepted')}
-                                  className="rounded-md bg-sky-900 px-3 py-1.5 text-sm font-semibold text-white"
+                                  className="rounded-lg bg-sky-900 px-3 py-1.5 text-sm font-semibold text-white"
                                 >
                                   Gördüm, doğru
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => resolve(i, 'needs_fix')}
-                                  className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold"
+                                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold"
                                 >
                                   Düzeltilmeli
                                 </button>
@@ -507,7 +391,7 @@ export function Review({
                         type="button"
                         disabled={open > 0 || needsFix > 0}
                         onClick={() => void approve()}
-                        className="justify-self-start rounded-md bg-emerald-800 px-4 py-2 font-semibold text-white disabled:opacity-40"
+                        className="justify-self-start rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white disabled:opacity-40"
                       >
                         KDU olarak onayla
                       </button>
@@ -520,6 +404,113 @@ export function Review({
                   </p>
                 )}
               </section>
+            )}
+            {x && (
+              <>
+                <section className="grid gap-2 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+                  <h2 className="text-sm font-semibold text-slate-800">Belge</h2>
+                  <p className="text-sm">
+                    {x.identity.supplier.value ?? 'Tedarikçi belirtilmemiş'} · sürüm{' '}
+                    {x.identity.revisionNumber.value ?? '?'} ·{' '}
+                    {x.identity.revisionDate.value ?? '?'}
+                  </p>
+                </section>
+                <section className="grid gap-2 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+                  <h2 className="text-sm font-semibold text-slate-800">
+                    Tedarikçinin verdiği sınıflandırma
+                  </h2>
+                  <ul className="flex flex-wrap gap-2">
+                    {x.productClassification.lines.length === 0 && (
+                      <li className="text-sm text-slate-500">Sınıflandırma satırı yok</li>
+                    )}
+                    {x.productClassification.lines.map((l, i) => (
+                      <HazardChip
+                        key={i}
+                        line={l}
+                        onShow={setPage}
+                        onPick={isKdu ? (code) => void setHCode(null, i, code) : null}
+                      />
+                    ))}
+                  </ul>
+                </section>
+                <section className="grid gap-2 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+                  <h2 className="text-sm font-semibold text-slate-800">İçindeki maddeler</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                          <th className="py-1.5 pr-3">Madde</th>
+                          <th className="py-1.5 pr-3">Oran</th>
+                          <th className="py-1.5">Sınıflar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {x.components.map((c, i) => (
+                          <tr key={i} className="border-b border-slate-100 align-top">
+                            <td className="py-2 pr-3">
+                              <b>{c.name.value ?? '?'}</b>
+                              <small className="block font-mono text-slate-500">
+                                CAS {c.cas.value ?? 'yok'}
+                              </small>
+                            </td>
+                            <td className="py-2 pr-3 font-mono whitespace-nowrap">
+                              {c.concentration?.raw ?? 'verilmemiş'}{' '}
+                              <PageLink page={c.concentration?.source.page} onShow={setPage} />
+                            </td>
+                            <td className="py-2 text-slate-600">
+                              {c.classifications.length === 0 && '—'}
+                              <ul className="grid gap-1">
+                                {c.classifications.map((l, j) => (
+                                  <li key={j} className="flex flex-wrap items-center gap-1.5">
+                                    <span>
+                                      {l.category ?? l.hazardClassAsWritten}
+                                      {l.hCode && (
+                                        <span className="ml-1 font-mono text-xs text-slate-500">
+                                          {l.hCode}
+                                          {l.hCodeChosenBy && ' (KDU seçti)'}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <HCodePicker
+                                      line={l}
+                                      onPick={isKdu ? (code) => void setHCode(i, j, code) : null}
+                                    />
+                                  </li>
+                                ))}
+                              </ul>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+                <section className="grid gap-2 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+                  <h2 className="text-sm font-semibold text-slate-800">Temel özellikler</h2>
+                  <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {PROPS.map(([key, label]) => {
+                      const p = x.physicalProperties.find((pp) => pp.property === key && pp.value);
+                      return (
+                        <div
+                          key={key}
+                          className="min-w-0 rounded-md border border-slate-200 px-3 py-2"
+                        >
+                          <dt className="text-xs text-slate-500">{label}</dt>
+                          <dd className="font-semibold break-words">
+                            {p ? (
+                              <>
+                                {p.value} <PageLink page={p.source.page} onShow={setPage} />
+                              </>
+                            ) : (
+                              <span className="font-normal text-amber-700 italic">belgede yok</span>
+                            )}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </section>
+              </>
             )}
           </div>
         </div>

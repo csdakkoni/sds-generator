@@ -737,7 +737,7 @@ export function SdsPanel({
             type="button"
             disabled={busy}
             onClick={() => void save()}
-            className="rounded-md bg-sky-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-sky-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             {latest ? 'Taslağı kaydet' : 'SDS taslağı oluştur'}
           </button>
@@ -782,7 +782,7 @@ export function SdsPanel({
 
       {trDoc && trDoc.sds_revisions.length > 0 && (
         <section className="grid gap-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Revizyonlar</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Revizyonlar</h3>
           <ul className="grid gap-1 text-sm">
             {trDoc.sds_revisions.map((r) => (
               <li

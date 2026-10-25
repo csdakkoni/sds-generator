@@ -51,8 +51,8 @@ const familyLabel = (f: string) => FAMILY_LABEL[f] ?? f.replace(/^other:/, '');
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</h2>
+    <section className="grid gap-3 rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+      <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
       {children}
     </section>
   );
@@ -185,7 +185,9 @@ export function SubstanceDetail({
         ← Kütüphane
       </a>
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{substance?.name ?? 'Bulunamadı'}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          {substance?.name ?? 'Bulunamadı'}
+        </h1>
         <p className="mt-1 font-mono text-sm text-slate-500">
           CAS {cas}
           {substance?.ec_number ? ` · EC ${substance.ec_number}` : ''}

@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ITEM_LABEL, openCounts, sortItems, type ReviewItem } from '../lib/kdu-list';
 import { supabase } from '../lib/supabase';
+import { Alert, Badge, buttonClass, EmptyState, PageHeader, type Tone } from '../ui';
+
+const TYPE_TONE: Record<string, Tone> = {
+  profile_conflict: 'bad',
+  data_gap: 'warn',
+  regulation_change: 'violet',
+  supplier_sds_match: 'info',
+  profile_draft: 'info',
+  draft_revision: 'neutral',
+};
 
 /** One list for everything waiting on a KDU decision. RLS shows each person only their items. */
 export function KduList({ userId }: { userId: string }) {
@@ -43,76 +53,90 @@ export function KduList({ userId }: { userId: string }) {
   const visible = sortItems(showDone ? items : open);
 
   return (
-    <div className="grid gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">KDU kontrol listesi</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Karar bekleyen her şey burada toplanır. Bekleyen bir kontrol işi durdurmaz: taslaklar
-          üretilmeye devam eder, yalnızca "kesinleşti" durumu KDU onayına bağlıdır.
-        </p>
+    <div className="grid gap-5">
+      <PageHeader
+        title="KDU kontrol listesi"
+        description='Karar bekleyen her şey burada toplanır. Bekleyen bir kontrol işi durdurmaz: taslaklar üretilmeye devam eder, yalnızca "kesinleşti" durumu KDU onayına bağlıdır.'
+      />
+      {error && <Alert>{error}</Alert>}
+      <div className="flex flex-wrap items-center gap-2">
+        {open.length === 0 ? (
+          <Badge tone="good">Bekleyen kontrol yok</Badge>
+        ) : (
+          <>
+            <span className="text-sm font-medium text-slate-700">{open.length} bekleyen:</span>
+            {Object.entries(counts).map(([type, n]) => (
+              <Badge key={type} tone={TYPE_TONE[type] ?? 'neutral'}>
+                {ITEM_LABEL[type as keyof typeof ITEM_LABEL] ?? type} {n}
+              </Badge>
+            ))}
+          </>
+        )}
+        <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            checked={showDone}
+            onChange={(e) => setShowDone(e.target.checked)}
+          />
+          Kapananları da göster
+        </label>
       </div>
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
-      <p className="text-sm text-slate-600">
-        {open.length === 0
-          ? 'Bekleyen kontrol yok.'
-          : `${open.length} bekleyen: ` +
-            Object.entries(counts)
-              .map(([type, n]) => `${ITEM_LABEL[type as keyof typeof ITEM_LABEL]} ${n}`)
-              .join(', ')}
-      </p>
-      <label className="flex items-center gap-2 text-sm text-slate-600">
-        <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
-        Kapananları da göster
-      </label>
-      <ul className="grid gap-2">
+      <ul className="grid divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        {visible.length === 0 && (
+          <li>
+            <EmptyState title="Liste boş">
+              Karar bekleyen bir şey çıktığında burada görünür.
+            </EmptyState>
+          </li>
+        )}
         {visible.map((item) => {
           const url = typeof item.detail.url === 'string' ? item.detail.url : null;
           return (
-            <li key={item.id} className="rounded-md border border-slate-200 bg-white p-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span className="rounded bg-slate-100 px-1.5 py-0.5">
-                  {ITEM_LABEL[item.item_type]}
-                </span>
-                <span>{new Date(item.created_at).toLocaleDateString('tr-TR')}</span>
-                {item.status !== 'open' && (
-                  <span>{item.status === 'resolved' ? 'Çözüldü' : 'Yoksayıldı'}</span>
-                )}
+            <li
+              key={item.id}
+              className={`flex flex-wrap items-center gap-3 px-5 py-4 ${item.status === 'open' ? '' : 'opacity-60'}`}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <Badge tone={TYPE_TONE[item.item_type] ?? 'neutral'}>
+                    {ITEM_LABEL[item.item_type] ?? item.item_type}
+                  </Badge>
+                  <span>{new Date(item.created_at).toLocaleDateString('tr-TR')}</span>
+                  {item.status !== 'open' && (
+                    <span>{item.status === 'resolved' ? 'Çözüldü' : 'Yoksayıldı'}</span>
+                  )}
+                </div>
+                <p className="mt-1 font-medium text-slate-900">{item.title}</p>
               </div>
-              <p className="mt-1 text-sm font-medium text-slate-900">
-                {url ? (
+              <div className="flex flex-wrap gap-2">
+                {url && (
                   <a
                     href={url}
                     {...(url.startsWith('#') ? {} : { target: '_blank', rel: 'noreferrer' })}
-                    className="text-sky-800 underline"
+                    className={buttonClass('primary')}
                   >
-                    {item.title}
+                    Aç
                   </a>
-                ) : (
-                  item.title
                 )}
-              </p>
-              {item.status === 'open' && (
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void close(item.id, 'resolved')}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:border-sky-300"
-                  >
-                    Çözüldü
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void close(item.id, 'dismissed')}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:border-sky-300"
-                  >
-                    İlgisiz
-                  </button>
-                </div>
-              )}
+                {item.status === 'open' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void close(item.id, 'resolved')}
+                      className={buttonClass('secondary')}
+                    >
+                      Çözüldü
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void close(item.id, 'dismissed')}
+                      className={buttonClass('ghost')}
+                    >
+                      İlgisiz
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           );
         })}

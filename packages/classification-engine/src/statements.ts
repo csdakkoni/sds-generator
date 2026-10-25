@@ -119,6 +119,52 @@ export function resolveStatements(
 }
 
 /**
+ * One dated report of a source about a substance (NITE-CMC publishes a new report when it
+ * revises a classification, sometimes only for some hazard classes).
+ */
+export interface SourceReport {
+  /** Fiscal year or similar; larger is newer. Null when the source does not date its reports. */
+  order: number | null;
+  hCodes: string[];
+  categoryTexts: string[];
+}
+
+/**
+ * Lines of a source that published several reports. Per hazard class the newest report that
+ * mentions the class wins; classes only an older report mentions stay valid, because a revision
+ * often covers only part of the classes (an environmental update must not erase the health
+ * classification). Reports of the same date count together.
+ */
+export function resolveReports(reports: SourceReport[]): {
+  lines: SourceLine[];
+  notInClp: string[];
+  notEvaluated: string[];
+} {
+  const resolved = reports.map((r) => ({
+    order: r.order ?? Number.NEGATIVE_INFINITY,
+    ...resolveStatements(r.hCodes, r.categoryTexts),
+  }));
+  const orders = [...new Set(resolved.map((r) => r.order))].sort((a, b) => b - a);
+  const covered = new Set<string>();
+  const lines: SourceLine[] = [];
+  for (const order of orders) {
+    const generation = resolved.filter((r) => r.order === order);
+    const generationLines = generation.flatMap((r) => r.lines);
+    for (const line of generationLines) {
+      if (!covered.has(classKey(line)) && !lines.some((l) => l.hCode === line.hCode)) {
+        lines.push(line);
+      }
+    }
+    for (const line of generationLines) covered.add(classKey(line));
+  }
+  return {
+    lines,
+    notInClp: [...new Set(resolved.flatMap((r) => r.notInClp))],
+    notEvaluated: [...new Set(resolved.flatMap((r) => r.notEvaluated))],
+  };
+}
+
+/**
  * Lines to draft with while sources are unconfirmed: per hazard class (acute toxicity per
  * route), the most severe category any source gives. A choice of the draft only; the KDU
  * confirms or changes it.

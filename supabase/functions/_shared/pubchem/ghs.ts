@@ -49,8 +49,12 @@ export interface SourceGhs {
   notClassified: boolean;
   /** Items that could not be read as a statement; shown to the KDU, never guessed. */
   unreadable: string[];
-  /** Older reports of the same source that were left out in favour of the newest one. */
-  superseded: string[];
+  /**
+   * The source's separate dated reports, when it published more than one. `statements` and
+   * `categoryTexts` above are their union; which report decides per hazard class is the
+   * engine's job (resolveReports).
+   */
+  reports: { name: string; order: number | null; hCodes: string[]; categoryTexts: string[] }[];
   snapshot: { references: Reference[]; items: Information[] };
 }
 
@@ -173,8 +177,8 @@ export function parseGhs(ghs: PugView, categories: PugView = {}): SourceGhs[] {
   }
 
   // A source can publish several reports of one substance (NITE-CMC: the original 2006 and the
-  // revised 2014 classification). Only the newest is used; merging them would put a superseded
-  // category next to its replacement and show a conflict the source itself resolved.
+  // revised 2014 or 2024 classification). They are kept apart in `reports`; `statements` is the
+  // union, so nothing a report lists is lost, and the engine decides per class which one counts.
   const bySource = new Map<string, Report[]>();
   for (const r of reports.values()) {
     const id = `pubchem:${slug(r.ref.SourceName ?? '')}`;
@@ -182,10 +186,7 @@ export function parseGhs(ghs: PugView, categories: PugView = {}): SourceGhs[] {
   }
   const out: SourceGhs[] = [];
   for (const [sourceId, all] of bySource) {
-    const newest = Math.max(...all.map((r) => r.ref.SortOrder ?? -Infinity));
-    const current = all.filter((r) => (r.ref.SortOrder ?? -Infinity) === newest);
-    const older = all.filter((r) => !current.includes(r));
-    const first = current[0]?.ref;
+    const first = [...all].sort((a, b) => (b.ref.SortOrder ?? 0) - (a.ref.SortOrder ?? 0))[0]?.ref;
     if (!first) continue;
     const e: SourceGhs = {
       sourceId,
@@ -198,19 +199,25 @@ export function parseGhs(ghs: PugView, categories: PugView = {}): SourceGhs[] {
       categoryTexts: [],
       notClassified: false,
       unreadable: [],
-      superseded: older.map((r) => r.ref.Name ?? `rapor ${r.ref.SortOrder ?? '?'}`),
+      reports: [],
       snapshot: { references: [], items: [] },
     };
     for (const r of all) {
       e.snapshot.references.push(r.ref);
       e.snapshot.items.push(...r.items);
-    }
-    for (const r of current) {
       for (const st of r.statements)
         if (!e.statements.some((x) => x.hCode === st.hCode)) e.statements.push(st);
       for (const t of r.categoryTexts) if (!e.categoryTexts.includes(t)) e.categoryTexts.push(t);
       e.notClassified = e.notClassified || r.notClassified;
       e.unreadable.push(...r.unreadable);
+      if (all.length > 1) {
+        e.reports.push({
+          name: r.ref.Name ?? `rapor ${r.ref.SortOrder ?? '?'}`,
+          order: r.ref.SortOrder ?? null,
+          hCodes: r.statements.map((x) => x.hCode),
+          categoryTexts: r.categoryTexts,
+        });
+      }
     }
     if (e.statements.length > 0) e.notClassified = false;
     if (e.statements.length > 0 || e.notClassified || e.unreadable.length > 0) out.push(e);

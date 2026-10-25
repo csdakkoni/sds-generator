@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { categoriesForHCode, compareSources, conservativeLines, resolveStatements } from '../src';
+import {
+  categoriesForHCode,
+  compareSources,
+  conservativeLines,
+  resolveReports,
+  resolveStatements,
+} from '../src';
 
 describe('categoriesForHCode (CLP Annex I tables)', () => {
   it('maps a statement to the categories that carry it', () => {
@@ -81,5 +87,59 @@ describe('compareSources with uncertain categories', () => {
       { sourceId: 'b', family: 'b', reference: 'b', lines: line },
     ]);
     expect(r.status).toBe('conflict');
+  });
+});
+
+describe('resolveReports (a source with several dated reports)', () => {
+  const stotSingle =
+    'Specific target organ toxicity - Single exposure - Category 3 (Respiratory tract irritation, Narcotic effects)';
+
+  it('lets the newest report win per hazard class (NITE-CMC acetone, 2006 and 2014)', () => {
+    const r = resolveReports([
+      {
+        order: 2006,
+        hCodes: ['H225', 'H305', 'H320', 'H335', 'H336', 'H361', 'H373'],
+        categoryTexts: [
+          'Flammable liquids - Category 2',
+          'Reproductive toxicity - Category 2',
+          stotSingle,
+          'Specific target organ toxicity - Repeated exposure - Category 2 (blood)',
+        ],
+      },
+      {
+        order: 2014,
+        hCodes: ['H225', 'H320', 'H335', 'H336', 'H361', 'H372'],
+        categoryTexts: [
+          'Flammable liquids - Category 2',
+          'Reproductive toxicity - Category 2',
+          stotSingle,
+          'Specific target organ toxicity - Repeated exposure - Category 1 (central nervous system)',
+        ],
+      },
+    ]);
+    expect(r.lines.map((l) => l.hCode).sort()).toEqual(['H225', 'H335', 'H336', 'H361', 'H372']);
+    expect(r.lines.find((l) => l.hCode === 'H372')?.category).toBe('STOT RE 1');
+    expect(r.notInClp.sort()).toEqual(['H305', 'H320']);
+  });
+
+  it('keeps classes only an older report covers (a 2024 update of the aquatic class alone)', () => {
+    const r = resolveReports([
+      { order: 2024, hCodes: ['H400'], categoryTexts: [] },
+      { order: 2009, hCodes: ['H314', 'H318', 'H331'], categoryTexts: [] },
+      { order: 2006, hCodes: ['H314', 'H318', 'H330', 'H331', 'H400'], categoryTexts: [] },
+    ]);
+    const seen = [...r.lines.map((l) => l.hCode), ...r.notEvaluated];
+    // Health classes from 2009 stay; 2006's H330 is a class (inhalation) 2009 already covers.
+    expect(seen).toEqual(expect.arrayContaining(['H400', 'H314', 'H318', 'H331']));
+    expect(seen).not.toContain('H330');
+  });
+
+  it('counts reports of the same date together and undated reports as the oldest', () => {
+    const r = resolveReports([
+      { order: null, hCodes: ['H302'], categoryTexts: [] },
+      { order: 2020, hCodes: ['H315'], categoryTexts: [] },
+      { order: 2020, hCodes: ['H319'], categoryTexts: [] },
+    ]);
+    expect(r.lines.map((l) => l.hCode).sort()).toEqual(['H302', 'H315', 'H319']);
   });
 });

@@ -14,7 +14,9 @@ export {
   categoriesForHCode,
   conservativeLines,
   hazardClassOf,
+  resolveReports,
   resolveStatements,
   type SourceLine,
+  type SourceReport,
 } from './statements';
 export type { Agreement, SourceClassification, SourceDifference } from './source-agreement';

@@ -6,6 +6,7 @@
 import {
   compareSources,
   conservativeLines,
+  resolveReports,
   resolveStatements,
   type Agreement,
   type SourceClassification,
@@ -21,7 +22,11 @@ export interface OutsideRecord {
   category_texts: string[];
   not_classified: boolean;
   fetched_at: string;
-  snapshot: { unreadable?: string[]; superseded?: string[] } | null;
+  snapshot: {
+    unreadable?: string[];
+    /** Present when the source published several dated reports. */
+    reports?: { name: string; order: number | null; hCodes: string[]; categoryTexts: string[] }[];
+  } | null;
 }
 
 export interface OutsideSource {
@@ -30,8 +35,8 @@ export interface OutsideSource {
   notInClp: string[];
   notEvaluated: string[];
   unreadable: string[];
-  /** Older reports of the same source that were not used (the newest one is). */
-  superseded: string[];
+  /** Names of the source's separate reports, when it has several (newest wins per class). */
+  reports: string[];
 }
 
 export interface OutsideSummary {
@@ -52,15 +57,19 @@ export interface ConfirmedProfile {
 
 export function summarise(cas: string, records: OutsideRecord[]): OutsideSummary {
   const sources = records.map((record) => {
-    const r = resolveStatements(
-      record.lines.map((l) => l.hCode),
-      record.category_texts,
-    );
+    const reports = record.snapshot?.reports ?? [];
+    const r =
+      reports.length > 1
+        ? resolveReports(reports)
+        : resolveStatements(
+            record.lines.map((l) => l.hCode),
+            record.category_texts,
+          );
     return {
       record,
       ...r,
       unreadable: record.snapshot?.unreadable ?? [],
-      superseded: record.snapshot?.superseded ?? [],
+      reports: reports.length > 1 ? reports.map((x) => x.name) : [],
     };
   });
   const classifications: SourceClassification[] = sources.map((s) => ({

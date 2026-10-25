@@ -79,40 +79,40 @@ describe('resolveCas', () => {
     expect(r.cids).toEqual([111, 222]);
   });
 
-  it('reaches compounds through depositor substance records', async () => {
+  it('takes name and EC number from depositor substance records, never their compounds', async () => {
     const r = await resolveCas(
       CAS,
       fake({
         [`${PUG}/substance/name/${CAS}/synonyms/JSON`]: syn([
-          { SID: 9, Synonym: [CAS, 'Lutensol TO 10', 'Alcohols, C13-iso-, ethoxylated'] },
+          {
+            SID: 9,
+            Synonym: [CAS, 'Lutensol TO 10', 'Isotridecanol, ethoxylated', 'EC 500-241-6'],
+          },
           { SID: 10, Synonym: ['unrelated'] },
         ]),
+        // A mapping to compounds exists, but its components (sulfuric acid, ...) must not be read.
         [`${PUG}/substance/sid/9/cids/JSON?cids_type=all`]: {
-          InformationList: { Information: [{ SID: 9, CID: [333] }] },
+          InformationList: { Information: [{ SID: 9, CID: [1118] }] },
         },
-        [`${PUG}/compound/cid/333/synonyms/JSON`]: syn([{ CID: 333, Synonym: ['x'] }]),
-        [`${PUG}/compound/cid/333/property/Title,MolecularFormula,MolecularWeight/JSON`]: props([
-          { CID: 333, Title: 'Tridecanol ethoxylate' },
-        ]),
-      }),
-    );
-    expect(r.identity?.cid).toBe(333);
-    expect(r.substanceName).toBe('Alcohols, C13-iso-, ethoxylated');
-    expect(r.cids).toEqual([333]);
-  });
-
-  it('keeps an inventory name when substance records have no compound', async () => {
-    const r = await resolveCas(
-      CAS,
-      fake({
-        [`${PUG}/substance/name/${CAS}/synonyms/JSON`]: syn([
-          { SID: 9, Synonym: [CAS, 'Alcohols, C13-iso-, ethoxylated'] },
-        ]),
       }),
     );
     expect(r.identity).toBeNull();
     expect(r.cids).toEqual([]);
-    expect(r.substanceName).toBe('Alcohols, C13-iso-, ethoxylated');
+    expect(r.substanceName).toBe('Isotridecanol, ethoxylated');
+    expect(r.substanceEc).toBe('500-241-6');
+  });
+
+  it('gives no name when depositor records list only trade names', async () => {
+    const r = await resolveCas(
+      CAS,
+      fake({
+        [`${PUG}/substance/name/${CAS}/synonyms/JSON`]: syn([
+          { SID: 9, Synonym: [CAS, 'Lutensol TO 10'] },
+        ]),
+      }),
+    );
+    expect(r.substanceName).toBeNull();
+    expect(r.substanceEc).toBeNull();
   });
 
   it('reports a failing step instead of hiding it', async () => {
@@ -125,6 +125,12 @@ describe('resolveCas', () => {
 
   it('finds nothing for a number PubChem does not know', async () => {
     const r = await resolveCas('50-00-0', fake({}));
-    expect(r).toMatchObject({ identity: null, cids: [], substanceName: null, errors: [] });
+    expect(r).toMatchObject({
+      identity: null,
+      cids: [],
+      substanceName: null,
+      substanceEc: null,
+      errors: [],
+    });
   });
 });

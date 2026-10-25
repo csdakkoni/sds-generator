@@ -116,11 +116,24 @@ describe('real PubChem data (acetone, 2026-10-24)', () => {
     expect(by('other:hazardous-substances-data-bank-hsdb')?.categoryTexts).toEqual([]);
   });
 
-  it('uses only the newest report of a source that published several', () => {
+  it('keeps every report of a source that published several, and their union', () => {
     const nite = by('jp_nite');
-    expect(codes('jp_nite')).toEqual(['H225', 'H320', 'H335', 'H336', 'H361', 'H372']);
-    expect(nite?.categoryTexts.some((t) => t.includes('Category 2 (blood)'))).toBe(false);
-    expect(nite?.superseded).toEqual(['Acetone - FY2006 (New/original classication)']);
+    expect(codes('jp_nite')).toEqual([
+      'H225',
+      'H320',
+      'H335',
+      'H336',
+      'H361',
+      'H372',
+      'H305',
+      'H373',
+    ]);
+    expect(nite?.reports.map((r) => [r.name, r.order])).toEqual([
+      ['Acetone - FY2014 (Revised classification)', 2014],
+      ['Acetone - FY2006 (New/original classication)', 2006],
+    ]);
+    expect(nite?.reports[0]?.hCodes).toEqual(['H225', 'H320', 'H335', 'H336', 'H361', 'H372']);
+    expect(by('au_hcis')?.reports).toEqual([]);
   });
 
   it('leaves out the copy of the EU CLP table and the ECHA aggregate', () => {

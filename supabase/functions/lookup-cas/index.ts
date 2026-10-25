@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     if (!substanceId && name) {
       const { data: inserted, error } = await admin
         .from('substances')
-        .insert({ cas_number: number, name, ec_number: identity?.ecNumber ?? null })
+        .insert({ cas_number: number, name, ec_number: identity?.ecNumber ?? found.substanceEc })
         .select('id')
         .single();
       if (error) throw new Error(error.message);
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
             snapshot: {
               cid,
               unreadable: s.unreadable,
-              superseded: s.superseded,
+              reports: s.reports,
               ...s.snapshot,
             },
             fetched_at: new Date().toISOString(),

@@ -10,7 +10,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { EXCLUDED_FAMILIES, parseGhs, type PugView } from '../_shared/pubchem/ghs.ts';
-import { parseIdentity } from '../_shared/pubchem/identity.ts';
+import { resolveCas } from '../_shared/pubchem/resolve.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -40,7 +40,6 @@ function validCas(cas: string): boolean {
   return sum % 10 === Number(digits.slice(-1));
 }
 
-const PUG = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug';
 const VIEW = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound';
 const MAX_AGE_MS = 30 * 24 * 3600 * 1000;
 
@@ -81,27 +80,29 @@ Deno.serve(async (req) => {
       return json({ found: true, substanceId: known.id, name: known.name, cached: true });
     }
 
-    const key = encodeURIComponent(number);
-    const synonyms = await get(`${PUG}/compound/name/${key}/synonyms/JSON`);
-    const properties = synonyms
-      ? await get(
-          `${PUG}/compound/name/${key}/property/Title,MolecularFormula,MolecularWeight/JSON`,
-        )
-      : null;
-    const identity = synonyms ? parseIdentity(number, synonyms, properties ?? {}) : null;
-    if (!identity && !known) {
-      // 'no_record': PubChem has no compound under this CAS (typical for polymers, ethoxylates and
-      // other mixtures of variable composition); 'not_listed': it matched something else.
-      const reason = synonyms ? 'not_listed' : 'no_record';
-      console.log(`lookup-cas ${number}: not found (${reason})`);
-      return json({ found: false, reason });
+    const found = await resolveCas(number, get);
+    console.log(`lookup-cas ${number}: ${found.steps.join('; ')}`);
+    const identity = found.identity;
+    const name = identity?.name ?? found.substanceName;
+    if (!name && found.errors.length > 0) {
+      return json({ error: `PubChem: ${found.errors[0]}` }, 502);
+    }
+    if (!name && !known) {
+      // 'no_record': nothing at PubChem carries this number; 'no_name': depositor records exist
+      // but none gives an inventory-style name (trade names are never stored).
+      return json({
+        found: false,
+        reason: found.steps.some((x) => /substance records: [1-9]/.test(x))
+          ? 'no_name'
+          : 'no_record',
+      });
     }
 
     let substanceId = known?.id as string | undefined;
-    if (!substanceId && identity) {
+    if (!substanceId && name) {
       const { data: inserted, error } = await admin
         .from('substances')
-        .insert({ cas_number: number, name: identity.name, ec_number: identity.ecNumber })
+        .insert({ cas_number: number, name, ec_number: identity?.ecNumber ?? null })
         .select('id')
         .single();
       if (error) throw new Error(error.message);
@@ -109,19 +110,22 @@ Deno.serve(async (req) => {
     }
 
     let stored = 0;
-    if (identity) {
-      const ghs = (await get(
-        `${VIEW}/${identity.cid}/JSON?heading=GHS%20Classification`,
-      )) as PugView | null;
+    const seen = new Set<string>();
+    for (const cid of found.cids) {
+      const ghs = (await get(`${VIEW}/${cid}/JSON?heading=GHS%20Classification`)) as PugView | null;
       const categories = ghs
         ? ((await get(
-            `${VIEW}/${identity.cid}/JSON?heading=Hazard%20Classes%20and%20Categories`,
+            `${VIEW}/${cid}/JSON?heading=Hazard%20Classes%20and%20Categories`,
           )) as PugView | null)
         : null;
       const sources = ghs
-        ? parseGhs(ghs, categories ?? {}).filter((s) => !EXCLUDED_FAMILIES.has(s.family))
+        ? parseGhs(ghs, categories ?? {}).filter(
+            (s) => !EXCLUDED_FAMILIES.has(s.family) && !seen.has(s.sourceId),
+          )
         : [];
+      console.log(`lookup-cas ${number}: CID ${cid} gives ${sources.length} sources`);
       for (const s of sources) {
+        seen.add(s.sourceId);
         // The registry keeps the licence decision; a refetch never resets it.
         const { error: regError } = await admin.from('outside_sources').upsert(
           {
@@ -145,13 +149,13 @@ Deno.serve(async (req) => {
             source_id: s.sourceId,
             family: s.family,
             name: s.sourceName,
-            reference: s.url ?? `PubChem CID ${identity.cid}`,
+            reference: s.url ?? `PubChem CID ${cid}`,
             lines: s.statements,
             category_texts: s.categoryTexts,
             not_classified: s.notClassified,
             data_license: registry?.data_license ?? 'unverified',
             snapshot: {
-              cid: identity.cid,
+              cid,
               unreadable: s.unreadable,
               superseded: s.superseded,
               ...s.snapshot,
@@ -164,7 +168,8 @@ Deno.serve(async (req) => {
         stored += 1;
       }
     }
-    if (substanceId) {
+    // A lookup PubChem failed to answer completely is not remembered as checked.
+    if (substanceId && found.errors.length === 0) {
       await admin
         .from('substances')
         .update({ outside_checked_at: new Date().toISOString() })
@@ -173,7 +178,7 @@ Deno.serve(async (req) => {
     return json({
       found: true,
       substanceId,
-      name: known?.name ?? identity?.name ?? null,
+      name: known?.name ?? name,
       sources: stored,
     });
   } catch (e) {

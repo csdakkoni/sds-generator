@@ -33,15 +33,20 @@ const MAX_SYNONYMS = 12;
 /**
  * Combines PubChem's synonym and property answers for one CAS number. Returns null when
  * PubChem's record does not list that CAS among its synonyms, so a fuzzy name match can
- * never attach another substance's identity to the number.
+ * never attach another substance's identity to the number. `registered` is for records found
+ * through PubChem's registry-number cross-reference (an exact match made by PubChem, not a name
+ * search), where the synonym list need not repeat the number.
  */
 export function parseIdentity(
   cas: string,
   synonyms: SynonymsResponse,
   properties: PropertyResponse,
+  registered = false,
 ): SubstanceIdentity | null {
   // A CAS number can match several records; take the first that lists it.
-  const info = synonyms.InformationList?.Information?.find((i) => i.Synonym?.includes(cas));
+  const info = registered
+    ? synonyms.InformationList?.Information?.find((i) => i.CID)
+    : synonyms.InformationList?.Information?.find((i) => i.Synonym?.includes(cas));
   const list = info?.Synonym ?? [];
   if (!info?.CID) return null;
   const props = properties.PropertyTable?.Properties?.find((p) => p.CID === info.CID);
